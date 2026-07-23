@@ -374,14 +374,17 @@ public class MainActivity extends Activity {
             }));
         }
 
+        final String paycheckSummary = "BOLO Board Paycheck Estimate\n"+
+                displayDate.format(start.getTime())+" – "+displayDate.format(end.getTime())+"\n"+
+                "Actual worked: "+actualWorked+" hrs\nPaid leave: "+paidLeave+" hrs\n"+
+                "Overtime: "+overtime+" hrs\nCourt: "+money(courtPay)+"\n"+
+                "Supplement: "+money(supplement)+"\nEstimated gross: "+money(gross);
+
         content.addView(action("Share Paycheck Summary",v->{
-            String text="BOLO Board Paycheck Estimate\n"+
-                    displayDate.format(start.getTime())+" – "+displayDate.format(end.getTime())+"\n"+
-                    "Actual worked: "+actualWorked+" hrs\nPaid leave: "+paidLeave+" hrs\n"+
-                    "Overtime: "+overtime+" hrs\nCourt: "+money(courtPay)+"\n"+
-                    "Supplement: "+money(supplement)+"\nEstimated gross: "+money(gross);
-            Intent send=new Intent(Intent.ACTION_SEND);send.setType("text/plain");
-            send.putExtra(Intent.EXTRA_TEXT,text);startActivity(Intent.createChooser(send,"Share paycheck summary"));
+            Intent send=new Intent(Intent.ACTION_SEND);
+            send.setType("text/plain");
+            send.putExtra(Intent.EXTRA_TEXT,paycheckSummary);
+            startActivity(Intent.createChooser(send,"Share paycheck summary"));
         }));
     }
 
