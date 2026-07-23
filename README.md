@@ -1,38 +1,23 @@
-# BOLO Board — Native Android APK Project
+# BOLO Board Native Android
 
-This is an Android application, not a website installation package.
+A fully offline Android application. It uses only the Android SDK and Java—no Kotlin, AndroidX, Firebase, or third-party libraries.
 
-## Build from a phone using GitHub
+## Features
 
-1. Create a new public GitHub repository named `BOLO-Board-Android`.
-2. Extract this ZIP in Samsung My Files.
-3. Upload all extracted files and folders to the root of the repository.
-4. Commit the upload to the `main` branch.
-5. Open the repository's **Actions** tab.
-6. Select **Build BOLO Board APK**.
-7. Open the newest completed run.
-8. Under **Artifacts**, download **BOLO-Board-Android-APK**.
-9. Extract the downloaded artifact ZIP.
-10. Tap `app-debug.apk`.
-11. Allow installation from GitHub or My Files if Android asks.
-12. Tap **Install**.
-
-## App features
-
-- Native Android APK
-- Fully offline
-- Police-themed interactive calendar
-- Patterns Alpha, Bravo, Charlie, and Delta
-- Pattern calculation through December 31, 2100
-- Manual day/night/off, overtime, comp, vacation, sick, court, and custom entries
+- Alpha, Bravo, Charlie, and Delta schedules
+- Day/night pay-period rotation
+- Manual calendar overrides
+- Vacation, sick, comp, court, custom, regular-extra, OT-requested, and comp-requested entries
 - 84-hour actual-work overtime threshold
-- 1.5x overtime and qualifying comp logic
-- Court subpoena pay
-- State supplemental pay
-- Vacation, sick, and comp banks
-- January 1 annual vacation and sick accruals
-- Monthly schedule sharing as an image
-- Android print / Save as PDF
-- Local device storage
+- 1.5× overtime
+- Straight and overtime-qualified comp calculations
+- Court pay: $50 per subpoena, maximum three
+- Supplemental pay on eligible checks
+- Leave balances and January 1 accrual
+- Monthly schedule sharing
+- Paycheck summary sharing
+- Offline device storage
 
-No cloud synchronization is included. Each installation keeps its own information on that device.
+## Build on GitHub
+
+Upload this ZIP to the repository, extract it in Codespaces, remove the ZIP, commit, and push. The GitHub Actions workflow creates `app-debug.apk`.
