@@ -1,23 +1,16 @@
-# BOLO Board Native Android
+# BOLO Board Native Android — Police UI Update
 
-A fully offline Android application. It uses only the Android SDK and Java—no Kotlin, AndroidX, Firebase, or third-party libraries.
+Version 1.1 includes:
 
-## Features
+- Bottom navigation padded above Android's Back/Home navigation area
+- BOLO BOARD title only
+- Dark police-themed interface
+- Police car and red/blue emergency-light header
+- Police-officer sun icon for day shifts
+- Police-officer moon icon for night shifts
+- Empty police car with ON VACATION note for vacation days
+- Badge-style off-duty icon
+- Redesigned payroll, leave, and settings screens
+- Existing offline scheduling and payroll logic retained
 
-- Alpha, Bravo, Charlie, and Delta schedules
-- Day/night pay-period rotation
-- Manual calendar overrides
-- Vacation, sick, comp, court, custom, regular-extra, OT-requested, and comp-requested entries
-- 84-hour actual-work overtime threshold
-- 1.5× overtime
-- Straight and overtime-qualified comp calculations
-- Court pay: $50 per subpoena, maximum three
-- Supplemental pay on eligible checks
-- Leave balances and January 1 accrual
-- Monthly schedule sharing
-- Paycheck summary sharing
-- Offline device storage
-
-## Build on GitHub
-
-Upload this ZIP to the repository, extract it in Codespaces, remove the ZIP, commit, and push. The GitHub Actions workflow creates `app-debug.apk`.
+Build through the included GitHub Actions workflow.
