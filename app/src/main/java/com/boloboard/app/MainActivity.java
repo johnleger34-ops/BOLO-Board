@@ -1111,25 +1111,7 @@ public class MainActivity extends Activity {
         p.setColor(Color.rgb(80,190,105)); for(int i=-3;i<=3;i++){ float dx=i*115; c.save(); c.rotate(i*12,x+dx,y-5-Math.abs(i)*22); c.drawRect(x+dx-30,y-20-Math.abs(i)*25,x+dx+30,y+15-Math.abs(i)*25,p); c.restore(); }
     }
 
-    private void sharePayStubSnapshotImage(JSONObject o, Calendar start, Calendar end) {
-        try {
-            Bitmap bmp=Bitmap.createBitmap(1080,1350,Bitmap.Config.ARGB_8888); Canvas c=new Canvas(bmp); Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
-            p.setColor(Color.rgb(5,14,25)); c.drawRect(0,0,1080,1350,p); p.setColor(Color.rgb(19,38,58)); c.drawRoundRect(new RectF(45,45,1035,1305),34,34,p);
-            p.setTextAlign(Paint.Align.CENTER); p.setTypeface(Typeface.DEFAULT_BOLD); p.setColor(Color.WHITE); p.setTextSize(70); c.drawText("BOLO BOARD PAY STUB",540,135,p);
-            p.setTextSize(40); p.setColor(gold); c.drawText(o.optString("name",activeProfile),540,195,p);
-            p.setTextSize(25); p.setColor(silver); c.drawText("Pay date: "+displayDate.format(new Date(o.optLong("payday"))),540,238,p);
-            c.drawText("Pay period: "+displayDate.format(start.getTime())+" – "+displayDate.format(end.getTime()),540,275,p);
-            drawMoneyOfficer(c,p,540,415); p.setTextAlign(Paint.Align.LEFT); int y=595;
-            y=stubLine(c,p,"Actual hours worked",String.format(Locale.US,"%.1f",o.optDouble("worked")),y);
-            y=stubLine(c,p,"Paid leave hours",String.format(Locale.US,"%.1f",o.optDouble("leave")),y);
-            y=stubLine(c,p,"Regular wages",money(o.optDouble("regularPay")),y); y=stubLine(c,p,"Overtime ("+String.format(Locale.US,"%.1f",o.optDouble("otHours"))+" hrs)",money(o.optDouble("otPay")),y);
-            y=stubLine(c,p,"Court pay",money(o.optDouble("courtPay")),y); y=stubLine(c,p,"Supplemental pay",money(o.optDouble("supplement")),y); y=stubLine(c,p,"Gross pay",money(o.optDouble("gross")),y);
-            y=stubLine(c,p,"Health insurance",money(o.optDouble("health")),y); y=stubLine(c,p,"Retirement",money(o.optDouble("retirement")),y); y=stubLine(c,p,"Federal withholding",money(o.optDouble("federal")),y); y=stubLine(c,p,"Louisiana withholding",money(o.optDouble("state")),y); y=stubLine(c,p,"Other deductions",money(o.optDouble("other")),y);
-            p.setColor(gold); p.setTextSize(46); p.setTypeface(Typeface.DEFAULT_BOLD); c.drawText("NET",85,y+40,p); p.setTextAlign(Paint.Align.RIGHT); c.drawText(money(o.optDouble("net")),995,y+40,p);
-            p.setTextAlign(Paint.Align.LEFT); p.setTextSize(28); p.setColor(silver); c.drawText("BANKS  •  Vacation "+formatHours(o.optDouble("vacation"))+"   Sick "+formatHours(o.optDouble("sick"))+"   Comp "+formatHours(o.optDouble("comp")),85,y+105,p);
-            File dir=new File(getCacheDir(),"shared"); dir.mkdirs(); File f=new File(dir,"bolo-paystub-"+o.optLong("payday")+"-"+System.currentTimeMillis()+".png"); FileOutputStream out=new FileOutputStream(f); bmp.compress(Bitmap.CompressFormat.PNG,100,out); out.close();
-            Uri uri=FileProvider.getUriForFile(this,getPackageName()+".fileprovider",f); Intent send=new Intent(Intent.ACTION_SEND); send.setType("image/png"); send.putExtra(Intent.EXTRA_STREAM,uri); send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); startActivity(Intent.createChooser(send,"Share saved pay stub"));
-        } catch(Exception e){ Toast.makeText(this,"Unable to create saved pay stub image",Toast.LENGTH_LONG).show(); }
+     }
     }
 
     private String formatRate(double value) {
