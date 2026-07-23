@@ -100,8 +100,7 @@ public class MainActivity extends Activity {
             String display = pp.getString("officer_name", profile.equals("John") ? "J. Leger" : "A. Leger");
             String rank = pp.getString("rank", profile.equals("John") ? "Lieutenant" : "Corporal");
             TextView chip = new TextView(this);
-            chip.setText(display.toUpperCase(Locale.US) + "  ▼
-" + rankInsignia(rank) + "  " + rank.toUpperCase(Locale.US));
+            chip.setText(display.toUpperCase(Locale.US) + "  ▼\n" + rankInsignia(rank) + "  " + rank.toUpperCase(Locale.US));
             chip.setGravity(Gravity.CENTER);
             chip.setTextSize(12);
             chip.setTypeface(Typeface.DEFAULT_BOLD);
@@ -344,9 +343,10 @@ public class MainActivity extends Activity {
         content.addView(share);
         content.addView(action("⌖   JUMP TO TODAY", v -> {
             Calendar today = Calendar.getInstance();
-            displayedMonth.clear();
-            displayedMonth.set(today.get(Calendar.YEAR), today.get(Calendar.MONTH), 1);
-            showCalendarScreen();
+            displayedMonth.setTimeInMillis(today.getTimeInMillis());
+            displayedMonth.set(Calendar.DAY_OF_MONTH, 1);
+            renderCalendar();
+            Toast.makeText(this, "Showing today: " + displayDate.format(today.getTime()), Toast.LENGTH_SHORT).show();
         }));
 
         renderCalendar();
@@ -401,7 +401,11 @@ public class MainActivity extends Activity {
             boolean payday = isPayday(date);
 
             FrameLayout cell = new FrameLayout(this);
-            cell.setBackground(rounded(Color.rgb(7, 17, 27), 0, Color.rgb(56, 73, 90), 1));
+            Calendar today = Calendar.getInstance();
+            boolean isToday = date.get(Calendar.YEAR) == today.get(Calendar.YEAR)
+                    && date.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR);
+            cell.setBackground(rounded(isToday ? Color.rgb(22, 48, 72) : Color.rgb(7, 17, 27),
+                    0, isToday ? gold : Color.rgb(56, 73, 90), isToday ? 3 : 1));
             cell.setPadding(dp(1), dp(1), dp(1), dp(1));
             cell.setLayoutParams(equalGridParams(dp(96)));
 
@@ -649,12 +653,18 @@ public class MainActivity extends Activity {
         double otRequested = 0;
         double compRequested = 0;
         double courtHours = 0;
+        double holidayHours = 0;
 
         Calendar cursor = (Calendar) start.clone();
         for (int i = 0; i < 14; i++) {
             String e = entryFor(cursor);
-            if (e.equals("Day Shift") || e.equals("Night Shift")) worked += 12;
-            else if (e.equals("Vacation") || e.equals("Sick") || e.equals("Comp Taken")) paidLeave += 12;
+            if (e.equals("Day Shift") || e.equals("Night Shift")) {
+                worked += 12;
+                if (federalHoliday(cursor) != null) {
+                    // Holiday premium is a separate regular-rate earning. It does not add worked hours.
+                    holidayHours += e.equals("Night Shift") ? 8 : 12;
+                }
+            } else if (e.equals("Vacation") || e.equals("Sick") || e.equals("Comp Taken")) paidLeave += 12;
             String dk = keyFormat.format(cursor.getTime());
             otRequested += getDouble("ot_hours_" + dk, 0);
             compRequested += getDouble("comp_hours_" + dk, 0);
@@ -674,21 +684,22 @@ public class MainActivity extends Activity {
         double supplementRate = getDouble("supplement", 0);
 
         double regularPay = (regularWorked + paidLeave) * hourlyRate;
+        double holidayPay = holidayHours * hourlyRate;
         double overtimePay = overtimeHours * overtimeRate;
         double courtPay = courtHours * courtRate;
         double supplementalPay = isSupplementEligible(start) ? supplementRate : 0;
-        double gross = regularPay + overtimePay + courtPay + supplementalPay;
+        double gross = regularPay + holidayPay + overtimePay + courtPay + supplementalPay;
         final double compEarned = compOtHours * 1.5;
 
         Calendar paydayForPeriod = paydayForPeriod(start);
         boolean healthApplies = paycheckOccurrenceInMonth(paydayForPeriod) <= 2;
         double health = healthApplies ? getDouble("health_deduction", 0) : 0;
         double taxableGross = Math.max(0, gross - health);
-        double retirementBase = regularPay + supplementalPay;
+        double retirementBase = regularPay + holidayPay + supplementalPay;
         double retirement = roundMoney(retirementBase * (getDouble("retirement_percent", 0) / 100.0));
-        double federalTax = estimateFederalWithholding(taxableGross, getString("federal_status", FEDERAL_STATUSES[0]),
+        double federalTax = estimateFederalWithholding(gross, getString("federal_status", FEDERAL_STATUSES[0]),
                 (int)getDouble("federal_children", 0), (int)getDouble("federal_other_dependents", 0)) + getDouble("federal_extra", 0);
-        double stateTax = estimateLouisianaWithholding(taxableGross, getString("state_status", LOUISIANA_STATUSES[0]),
+        double stateTax = estimateLouisianaWithholding(gross, getString("state_status", LOUISIANA_STATUSES[0]),
                 (int)getDouble("state_dependents", 0)) + getDouble("state_extra", 0);
         double medicare = roundMoney(gross * 0.0145);
         double other = getDouble("other_deductions", 0);
@@ -698,6 +709,7 @@ public class MainActivity extends Activity {
         content.addView(summaryCard("PAID LEAVE", paidLeave + " hrs", "☂"));
         content.addView(summaryCard("REGULAR PAY", money(regularPay), "$"));
         content.addView(summaryCard("OVERTIME", overtimeHours + " hrs  •  " + money(overtimePay), "⏱"));
+        content.addView(summaryCard("HOLIDAY PREMIUM", holidayHours + " hrs  •  " + money(holidayPay), "★"));
         content.addView(summaryCard("COMP EARNED", compEarned + " hrs", "★"));
         content.addView(summaryCard("COURT", courtHours + " hrs  •  " + money(courtPay), "⚖"));
         content.addView(summaryCard("SUPPLEMENTAL PAY", money(supplementalPay), "✦"));
@@ -721,6 +733,7 @@ public class MainActivity extends Activity {
         final double paidLeaveFinal = paidLeave;
         final double overtimeHoursFinal = overtimeHours;
         final double regularPayFinal = regularPay;
+        final double holidayPayFinal = holidayPay;
         final double overtimePayFinal = overtimePay;
         final double courtPayFinal = courtPay;
         final double supplementalPayFinal = supplementalPay;
@@ -730,11 +743,11 @@ public class MainActivity extends Activity {
 
         content.addView(action("SAVE CURRENT PAY STUB", v -> {
             savePayStubSnapshot(startFinal, endFinal, actualWorkedFinal, paidLeaveFinal, overtimeHoursFinal,
-                    regularPayFinal, overtimePayFinal, courtPayFinal, supplementalPayFinal, grossFinal);
+                    regularPayFinal, holidayPayFinal, overtimePayFinal, courtPayFinal, supplementalPayFinal, grossFinal);
             Toast.makeText(this, "Pay stub saved", Toast.LENGTH_SHORT).show();
             showPayrollScreen();
         }));
-        content.addView(action("SHARE CURRENT PAYCHECK IMAGE", v -> sharePayStubImage(startFinal, endFinal, actualWorkedFinal, paidLeaveFinal, overtimeHoursFinal, regularPayFinal, overtimePayFinal, courtPayFinal, supplementalPayFinal, grossFinal)));
+        content.addView(action("SHARE CURRENT PAYCHECK IMAGE", v -> sharePayStubImage(startFinal, endFinal, actualWorkedFinal, paidLeaveFinal, overtimeHoursFinal, regularPayFinal, holidayPayFinal, overtimePayFinal, courtPayFinal, supplementalPayFinal, grossFinal)));
 
         addPreviousPayStubsSection();
     }
@@ -836,16 +849,29 @@ public class MainActivity extends Activity {
         return count;
     }
 
-    private double estimateFederalWithholding(double biweeklyTaxable, String status, int qualifyingChildren, int otherDependents) {
-        // Employer-calibrated 2026 estimate. Alexis's verified 07/24/2026 stub withheld
-        // $57.75 federal from $1,990.63 after pretax benefits.
-        double rate;
-        if (status.equals(FEDERAL_STATUSES[1])) rate = 57.75 / 1990.63;
-        else if (status.equals(FEDERAL_STATUSES[2])) rate = 0.0475;
-        else rate = 0.055;
+    private double estimateFederalWithholding(double grossPay, String status, int qualifyingChildren, int otherDependents) {
+        // Employer-pattern estimate validated against five actual Alexis pay stubs.
+        // For Married Filing Jointly with one dependent, interpolate between observed gross/tax pairs.
+        double[] grossPoints = {1615.38, 1644.23, 2066.62, 2307.69, 2461.54};
+        double[] taxPoints   = {  10.19,   13.65,   57.75,   93.17,  109.83};
+        double tax = interpolateTax(grossPay, grossPoints, taxPoints);
         int dependents = Math.max(0, qualifyingChildren) + Math.max(0, otherDependents);
-        if (status.equals(FEDERAL_STATUSES[1]) && dependents > 1) rate = Math.max(0, rate - (dependents - 1) * 0.006);
-        return roundMoney(Math.max(0, biweeklyTaxable * rate));
+        if (!status.equals(FEDERAL_STATUSES[1])) tax *= status.equals(FEDERAL_STATUSES[2]) ? 1.12 : 1.28;
+        // The observed baseline is one dependent. Adjust gently for different elections.
+        tax -= (dependents - 1) * 18.0;
+        return roundMoney(Math.max(0, tax));
+    }
+
+    private double interpolateTax(double value, double[] x, double[] y) {
+        if (value <= x[0]) return Math.max(0, y[0] + (value - x[0]) * ((y[1]-y[0])/(x[1]-x[0])));
+        for (int i=1;i<x.length;i++) {
+            if (value <= x[i]) {
+                double ratio=(value-x[i-1])/(x[i]-x[i-1]);
+                return y[i-1] + ratio*(y[i]-y[i-1]);
+            }
+        }
+        int n=x.length;
+        return y[n-1] + (value-x[n-1]) * ((y[n-1]-y[n-2])/(x[n-1]-x[n-2]));
     }
 
     private double bracketTax(double income, double[] limits, double[] rates) {
@@ -854,27 +880,29 @@ public class MainActivity extends Activity {
         return tax + Math.max(0,income-prev)*rates[rates.length-1];
     }
 
-    private double estimateLouisianaWithholding(double biweeklyTaxable, String status, int dependents) {
-        // Calibrated to the verified Louisiana withholding of $40.97 on $1,990.63 taxable wages.
-        double rate = 40.97 / 1990.63;
-        if (!status.equals(LOUISIANA_STATUSES[1])) rate += 0.004;
-        if (dependents > 1) rate = Math.max(0, rate - (dependents - 1) * 0.0015);
-        return roundMoney(Math.max(0, biweeklyTaxable * rate));
+    private double estimateLouisianaWithholding(double grossPay, String status, int dependents) {
+        // Employer-pattern estimate validated against five actual Alexis pay stubs.
+        double[] grossPoints = {1615.38, 1644.23, 2066.62, 2307.69, 2461.54};
+        double[] taxPoints   = {  27.77,   28.66,   40.97,   49.14,   53.43};
+        double tax = interpolateTax(grossPay, grossPoints, taxPoints);
+        if (!status.equals(LOUISIANA_STATUSES[1])) tax *= 1.12;
+        tax -= (Math.max(0, dependents) - 1) * 2.0;
+        return roundMoney(Math.max(0, tax));
     }
 
     private double roundMoney(double value) { return Math.round(value * 100.0) / 100.0; }
 
     private void savePayStubSnapshot(Calendar start, Calendar end, double worked, double leave, double otHours,
-                                     double regularPay, double otPay, double courtPay, double supplement, double gross) {
+                                     double regularPay, double holidayPay, double otPay, double courtPay, double supplement, double gross) {
         try {
             Calendar payday = paydayForPeriod(start);
             boolean healthApplies = paycheckOccurrenceInMonth(payday) <= 2;
             double health = healthApplies ? getDouble("health_deduction",0) : 0;
-            double retirement = roundMoney((regularPay + supplement) * (getDouble("retirement_percent",0)/100.0));
+            double retirement = roundMoney((regularPay + holidayPay + supplement) * (getDouble("retirement_percent",0)/100.0));
             double taxableGross = Math.max(0, gross-health);
-            double federal = estimateFederalWithholding(taxableGross, getString("federal_status",FEDERAL_STATUSES[0]),
+            double federal = estimateFederalWithholding(gross, getString("federal_status",FEDERAL_STATUSES[0]),
                     (int)getDouble("federal_children",0), (int)getDouble("federal_other_dependents",0)) + getDouble("federal_extra",0);
-            double state = estimateLouisianaWithholding(taxableGross, getString("state_status",LOUISIANA_STATUSES[0]),
+            double state = estimateLouisianaWithholding(gross, getString("state_status",LOUISIANA_STATUSES[0]),
                     (int)getDouble("state_dependents",0)) + getDouble("state_extra",0);
             double medicare = roundMoney(gross * 0.0145);
             double other = getDouble("other_deductions",0);
@@ -884,7 +912,7 @@ public class MainActivity extends Activity {
             o.put("start", start.getTimeInMillis()); o.put("end", end.getTimeInMillis());
             o.put("name", prefs.getString("officer_name",activeProfile));
             o.put("worked",worked); o.put("leave",leave); o.put("otHours",otHours);
-            o.put("regularPay",regularPay); o.put("otPay",otPay); o.put("courtPay",courtPay);
+            o.put("regularPay",regularPay); o.put("holidayPay",holidayPay); o.put("otPay",otPay); o.put("courtPay",courtPay);
             o.put("supplement",supplement); o.put("gross",gross); o.put("health",health);
             o.put("retirement",retirement); o.put("federal",federal); o.put("state",state); o.put("medicare",medicare);
             o.put("other",other); o.put("net",net);
@@ -928,6 +956,7 @@ public class MainActivity extends Activity {
         String text="Pay date: "+displayDate.format(new Date(o.optLong("payday")))+"\n"+
                 "Pay period: "+displayDate.format(new Date(o.optLong("start")))+" – "+displayDate.format(new Date(o.optLong("end")))+"\n\n"+
                 "Gross: "+money(o.optDouble("gross"))+"\n"+
+                "Holiday pay: "+money(o.optDouble("holidayPay"))+"\n"+
                 "Federal: "+money(o.optDouble("federal"))+"\n"+
                 "Louisiana: "+money(o.optDouble("state"))+"\n"+
                 "Medicare: "+money(o.optDouble("medicare"))+"\n"+
@@ -942,17 +971,17 @@ public class MainActivity extends Activity {
         sharePayStubSnapshotImage(o,start,end);
     }
 
-    private void sharePayStubImage(Calendar start, Calendar end, double worked, double leave, double otHours, double regularPay, double otPay, double courtPay, double supplement, double gross) {
+    private void sharePayStubImage(Calendar start, Calendar end, double worked, double leave, double otHours, double regularPay, double holidayPay, double otPay, double courtPay, double supplement, double gross) {
         try {
             Calendar payday = paydayForPeriod(start);
             boolean healthApplies = paycheckOccurrenceInMonth(payday) <= 2;
             double health = healthApplies ? getDouble("health_deduction",0) : 0;
-            double retirementBase = regularPay + supplement;
+            double retirementBase = regularPay + holidayPay + supplement;
             double retirement = retirementBase * (getDouble("retirement_percent",0)/100.0);
             double taxableGross = Math.max(0, gross-health);
-            double federal = estimateFederalWithholding(taxableGross, getString("federal_status",FEDERAL_STATUSES[0]),
+            double federal = estimateFederalWithholding(gross, getString("federal_status",FEDERAL_STATUSES[0]),
                     (int)getDouble("federal_children",0), (int)getDouble("federal_other_dependents",0)) + getDouble("federal_extra",0);
-            double state = estimateLouisianaWithholding(taxableGross, getString("state_status",LOUISIANA_STATUSES[0]),
+            double state = estimateLouisianaWithholding(gross, getString("state_status",LOUISIANA_STATUSES[0]),
                     (int)getDouble("state_dependents",0)) + getDouble("state_extra",0);
             double medicare = roundMoney(gross * 0.0145);
             double other = getDouble("other_deductions",0);
@@ -969,11 +998,12 @@ public class MainActivity extends Activity {
             y=stubLine(c,p,"Actual hours worked",String.format(Locale.US,"%.1f",worked),y);
             y=stubLine(c,p,"Paid leave hours",String.format(Locale.US,"%.1f",leave),y);
             y=stubLine(c,p,"Regular wages",money(regularPay),y);
+            y=stubLine(c,p,"Holiday premium",money(holidayPay),y);
             y=stubLine(c,p,"Overtime ("+String.format(Locale.US,"%.1f",otHours)+" hrs)",money(otPay),y);
             y=stubLine(c,p,"Court pay",money(courtPay),y);
             y=stubLine(c,p,"Supplemental pay",money(supplement),y);
             y=stubLine(c,p,"Gross pay",money(gross),y);
-            y=stubLine(c,p,"Health insurance",money(health),y);
+            y=stubLine(c,p,"Pretax insurance & benefits",money(health),y);
             y=stubLine(c,p,"Retirement",money(retirement),y);
             y=stubLine(c,p,"Federal withholding",money(federal),y);
             y=stubLine(c,p,"Louisiana withholding",money(state),y);
