@@ -23,6 +23,8 @@ public class MainActivity extends Activity {
 
     private static final String PREFS = "bolo_board";
     private static final String[] PATTERNS = {"Alpha", "Bravo", "Charlie", "Delta"};
+    private static final String[] FEDERAL_STATUSES = {"Single or Married Filing Separately", "Married Filing Jointly", "Head of Household"};
+    private static final String[] LOUISIANA_STATUSES = {"Single / Married Filing Separately", "Married Filing Jointly", "Head of Household"};
     private static final String[] ENTRY_TYPES = {
             "Use Schedule", "Day Shift", "Night Shift", "Day Off",
             "Extra Shift - Regular", "Extra Shift - OT Requested",
@@ -367,7 +369,7 @@ public class MainActivity extends Activity {
             FrameLayout cell = new FrameLayout(this);
             cell.setBackground(rounded(Color.rgb(7, 17, 27), 0, Color.rgb(56, 73, 90), 1));
             cell.setPadding(dp(1), dp(1), dp(1), dp(1));
-            cell.setLayoutParams(equalGridParams(dp(78)));
+            cell.setLayoutParams(equalGridParams(dp(96)));
 
             TextView number = new TextView(this);
             number.setText(String.valueOf(d));
@@ -377,20 +379,23 @@ public class MainActivity extends Activity {
             number.setPadding(dp(3), dp(1), 0, 0);
             cell.addView(number, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.LEFT));
 
-            ShiftIconView icon = new ShiftIconView(this, payday ? "Payday" : status);
+            ShiftIconView icon = new ShiftIconView(this, status);
             FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(-1, -1);
-            iconLp.setMargins(dp(2), dp(12), dp(2), dp(14));
+            iconLp.setMargins(dp(2), dp(12), dp(2), dp(30));
             cell.addView(icon, iconLp);
 
-            if (holiday != null) {
+            String extras = extrasLabel(date);
+            String bottomText = extras;
+            if (holiday != null) bottomText = (bottomText.isEmpty() ? "" : bottomText + "\n") + holiday;
+            if (!bottomText.isEmpty()) {
                 TextView hol = new TextView(this);
-                hol.setText(holiday);
+                hol.setText(bottomText);
                 hol.setTextColor(gold);
-                hol.setTextSize(7);
+                hol.setTextSize(6.6f);
                 hol.setTypeface(Typeface.DEFAULT_BOLD);
                 hol.setGravity(Gravity.CENTER);
-                hol.setMaxLines(2);
-                FrameLayout.LayoutParams hlp = new FrameLayout.LayoutParams(-1, dp(18), Gravity.BOTTOM);
+                hol.setMaxLines(3);
+                FrameLayout.LayoutParams hlp = new FrameLayout.LayoutParams(-1, dp(26), Gravity.BOTTOM);
                 hlp.setMargins(dp(1),0,dp(1),dp(1));
                 cell.addView(hol, hlp);
             }
@@ -411,54 +416,63 @@ public class MainActivity extends Activity {
 
     private void editDate(Calendar date) {
         String dateKey = keyFormat.format(date.getTime());
-        String key = "entry_" + dateKey;
-        int checked = 0;
-        String current = prefs.getString(key, "Use Schedule");
-        for (int i = 0; i < ENTRY_TYPES.length; i++) if (ENTRY_TYPES[i].equals(current)) checked = i;
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(18), dp(6), dp(18), 0);
+
+        TextView baseLabel = new TextView(this);
+        baseLabel.setText("BASE SCHEDULE FOR THIS DATE");
+        baseLabel.setTextColor(muted);
+        baseLabel.setTypeface(Typeface.DEFAULT_BOLD);
+        form.addView(baseLabel);
+
+        Spinner baseSpinner = new Spinner(this);
+        String[] baseChoices = {"Use Schedule", "Day Shift", "Night Shift", "Day Off", "Vacation", "Sick", "Comp Taken", "Custom Event"};
+        baseSpinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, baseChoices));
+        String currentBase = prefs.getString("entry_" + dateKey, "Use Schedule");
+        for (int i=0;i<baseChoices.length;i++) if (baseChoices[i].equals(currentBase)) baseSpinner.setSelection(i);
+        form.addView(baseSpinner);
+
+        EditText otHours = input("Overtime hours added", formatRate(getDouble("ot_hours_" + dateKey, 0)), true);
+        EditText compHours = input("Comp-requested hours added", formatRate(getDouble("comp_hours_" + dateKey, 0)), true);
+        EditText courtHours = input("Court hours added", formatRate(getDouble("court_hours_" + dateKey, 0)), true);
+        form.addView(labeledField("OVERTIME HOURS", otHours));
+        form.addView(labeledField("COMP-REQUESTED HOURS", compHours));
+        form.addView(labeledField("COURT HOURS", courtHours));
 
         new AlertDialog.Builder(this)
                 .setTitle(displayDate.format(date.getTime()))
-                .setSingleChoiceItems(ENTRY_TYPES, checked, null)
+                .setView(form)
                 .setPositiveButton("Save", (dialog, which) -> {
-                    AlertDialog ad = (AlertDialog) dialog;
-                    int pos = ad.getListView().getCheckedItemPosition();
-                    String selected = ENTRY_TYPES[pos];
-                    if (selected.equals("Extra Shift - OT Requested") || selected.equals("Extra Shift - Comp Requested")) {
-                        promptExtraHours(date, current, selected);
-                    } else {
-                        saveDateEntry(dateKey, current, selected, 0);
-                    }
+                    String oldBase = prefs.getString("entry_" + dateKey, "Use Schedule");
+                    String selectedBase = baseChoices[baseSpinner.getSelectedItemPosition()];
+                    saveMultiDateEntry(dateKey, oldBase, selectedBase,
+                            Math.max(0, parse(otHours.getText().toString())),
+                            Math.max(0, parse(compHours.getText().toString())),
+                            Math.max(0, parse(courtHours.getText().toString())));
+                })
+                .setNeutralButton("Clear extras", (dialog, which) -> {
+                    prefs.edit().remove("ot_hours_" + dateKey).remove("comp_hours_" + dateKey).remove("court_hours_" + dateKey).apply();
+                    renderCalendar();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
-    private void promptExtraHours(Calendar date, String oldValue, String selected) {
-        String dateKey = keyFormat.format(date.getTime());
-        EditText hours = input("Total hours worked", formatRate(getDouble("hours_" + dateKey, 12)), true);
-        new AlertDialog.Builder(this)
-                .setTitle(selected)
-                .setMessage("Enter the actual number of hours worked on this extra shift.")
-                .setView(hours)
-                .setPositiveButton("Save", (d,w) -> {
-                    double h = Math.max(0, parse(hours.getText().toString()));
-                    saveDateEntry(dateKey, oldValue, selected, h);
-                })
-                .setNegativeButton("Cancel", null).show();
+    private void saveMultiDateEntry(String dateKey, String oldBase, String selectedBase, double ot, double comp, double court) {
+        SharedPreferences.Editor ed = prefs.edit();
+        if (selectedBase.equals("Use Schedule")) ed.remove("entry_" + dateKey);
+        else ed.putString("entry_" + dateKey, selectedBase);
+        putOrRemove(ed, "ot_hours_" + dateKey, ot);
+        putOrRemove(ed, "comp_hours_" + dateKey, comp);
+        putOrRemove(ed, "court_hours_" + dateKey, court);
+        ed.apply();
+        adjustLeaveForEntry(oldBase, selectedBase);
+        renderCalendar();
     }
 
-    private void saveDateEntry(String dateKey, String oldValue, String selected, double hours) {
-        SharedPreferences.Editor ed = prefs.edit();
-        String key = "entry_" + dateKey;
-        if (selected.equals("Use Schedule")) { ed.remove(key); ed.remove("hours_" + dateKey); }
-        else {
-            ed.putString(key, selected);
-            if (selected.startsWith("Extra Shift")) ed.putString("hours_" + dateKey, String.valueOf(hours > 0 ? hours : 12));
-            else ed.remove("hours_" + dateKey);
-        }
-        ed.apply();
-        adjustLeaveForEntry(oldValue, selected);
-        renderCalendar();
+    private void putOrRemove(SharedPreferences.Editor ed, String key, double value) {
+        if (value > 0) ed.putString(key, String.valueOf(value)); else ed.remove(key);
     }
 
     private void adjustLeaveForEntry(String oldValue, String newValue) {
@@ -470,6 +484,23 @@ public class MainActivity extends Activity {
             if (newValue.equals("Sick")) addBalance("sick_balance", -12);
             if (newValue.equals("Comp Taken")) addBalance("comp_balance", -12);
         }
+    }
+
+    private String extrasLabel(Calendar date) {
+        String k = keyFormat.format(date.getTime());
+        ArrayList<String> parts = new ArrayList<>();
+        double ot = getDouble("ot_hours_" + k, 0);
+        double comp = getDouble("comp_hours_" + k, 0);
+        double court = getDouble("court_hours_" + k, 0);
+        if (ot > 0) parts.add("OT " + compactHours(ot));
+        if (comp > 0) parts.add("COMP " + compactHours(comp));
+        if (court > 0) parts.add("COURT " + compactHours(court));
+        if (isPayday(date)) parts.add("Payday");
+        return android.text.TextUtils.join(" • ", parts);
+    }
+
+    private String compactHours(double h) {
+        return (Math.rint(h)==h ? String.format(Locale.US,"%.0f",h) : String.format(Locale.US,"%.1f",h)) + "h";
     }
 
     private String entryFor(Calendar date) {
@@ -581,51 +612,64 @@ public class MainActivity extends Activity {
 
         double worked = 0;
         double paidLeave = 0;
-        double straightExtra = 0;
         double otRequested = 0;
         double compRequested = 0;
-        int subpoenas = 0;
+        double courtHours = 0;
 
         Calendar cursor = (Calendar) start.clone();
         for (int i = 0; i < 14; i++) {
             String e = entryFor(cursor);
             if (e.equals("Day Shift") || e.equals("Night Shift")) worked += 12;
-            else if (e.equals("Extra Shift - Regular")) straightExtra += extraHoursFor(cursor);
-            else if (e.equals("Extra Shift - OT Requested")) otRequested += extraHoursFor(cursor);
-            else if (e.equals("Extra Shift - Comp Requested")) compRequested += extraHoursFor(cursor);
             else if (e.equals("Vacation") || e.equals("Sick") || e.equals("Comp Taken")) paidLeave += 12;
-            else if (e.equals("Court")) subpoenas++;
+            String dk = keyFormat.format(cursor.getTime());
+            otRequested += getDouble("ot_hours_" + dk, 0);
+            compRequested += getDouble("comp_hours_" + dk, 0);
+            courtHours += getDouble("court_hours_" + dk, 0);
             cursor.add(Calendar.DAY_OF_MONTH, 1);
         }
 
-        double actualWorked = worked + straightExtra + otRequested + compRequested;
-        double overtimeHours = Math.max(0, actualWorked - 84);
-        double regularWorked = actualWorked - overtimeHours;
+        double actualWorked = worked + otRequested + compRequested;
+        double overtimePool = Math.max(0, actualWorked - 84);
+        double overtimeHours = Math.min(otRequested, overtimePool);
+        double compOtHours = Math.min(compRequested, Math.max(0, overtimePool - overtimeHours));
+        double regularWorked = Math.min(84, actualWorked);
         double hourlyRate = getDouble("hourly_rate", 0);
         double overtimeRate = getDouble("overtime_rate", 0);
         if (overtimeRate <= 0 && hourlyRate > 0) overtimeRate = hourlyRate * 1.5;
-        double courtRate = getDouble("court_rate", 50);
+        double courtRate = getDouble("court_rate", 0);
         double supplementRate = getDouble("supplement", 0);
 
         double regularPay = (regularWorked + paidLeave) * hourlyRate;
         double overtimePay = overtimeHours * overtimeRate;
-        double courtPay = Math.min(3, subpoenas) * courtRate;
+        double courtPay = courtHours * courtRate;
         double supplementalPay = isSupplementEligible(start) ? supplementRate : 0;
         double gross = regularPay + overtimePay + courtPay + supplementalPay;
+        final double compEarned = compOtHours * 1.5;
 
-        double beforeComp = Math.max(0, 84 - (worked + straightExtra + otRequested));
-        double straightComp = Math.min(compRequested, beforeComp);
-        double overtimeComp = Math.max(0, compRequested - straightComp);
-        final double compEarned = straightComp + (overtimeComp * 1.5);
+        Calendar paydayForPeriod = paydayForPeriod(start);
+        boolean healthApplies = paycheckOccurrenceInMonth(paydayForPeriod) <= 2;
+        double health = healthApplies ? getDouble("health_deduction", 0) : 0;
+        double taxableGross = Math.max(0, gross - health);
+        double retirementBase = regularPay + supplementalPay;
+        double retirement = retirementBase * (getDouble("retirement_percent", 0) / 100.0);
+        double federalTax = estimateFederalWithholding(taxableGross, getString("federal_status", FEDERAL_STATUSES[0])) + getDouble("federal_extra", 0);
+        double stateTax = estimateLouisianaWithholding(taxableGross, getString("state_status", LOUISIANA_STATUSES[0])) + getDouble("state_extra", 0);
+        double other = getDouble("other_deductions", 0);
+        double net = gross - health - retirement - federalTax - stateTax - other;
 
         content.addView(summaryCard("ACTUAL WORKED", actualWorked + " hrs", "⚡"));
         content.addView(summaryCard("PAID LEAVE", paidLeave + " hrs", "☂"));
         content.addView(summaryCard("REGULAR PAY", money(regularPay), "$"));
         content.addView(summaryCard("OVERTIME", overtimeHours + " hrs  •  " + money(overtimePay), "⏱"));
         content.addView(summaryCard("COMP EARNED", compEarned + " hrs", "★"));
-        content.addView(summaryCard("COURT PAY", money(courtPay), "⚖"));
+        content.addView(summaryCard("COURT", courtHours + " hrs  •  " + money(courtPay), "⚖"));
         content.addView(summaryCard("SUPPLEMENTAL PAY", money(supplementalPay), "✦"));
         content.addView(summaryCard("ESTIMATED GROSS CHECK", money(gross), "$"));
+        content.addView(summaryCard("HEALTH (PRETAX)", healthApplies ? money(health) : "$0.00 • third check", "✚"));
+        content.addView(summaryCard("RETIREMENT", money(retirement), "★"));
+        content.addView(summaryCard("FEDERAL WITHHOLDING", money(federalTax), "F"));
+        content.addView(summaryCard("LOUISIANA WITHHOLDING", money(stateTax), "LA"));
+        content.addView(summaryCard("ESTIMATED NET CHECK", money(net), "$"));
 
         if (compEarned > 0) {
             content.addView(action("ADD EARNED COMP TO BANK", v -> {
@@ -733,14 +777,53 @@ public class MainActivity extends Activity {
     private boolean isNthWeekday(Calendar c,int weekday,int nth){ return c.get(Calendar.DAY_OF_WEEK)==weekday && ((c.get(Calendar.DAY_OF_MONTH)-1)/7+1)==nth; }
     private boolean isLastWeekday(Calendar c,int weekday){ if(c.get(Calendar.DAY_OF_WEEK)!=weekday)return false; Calendar n=(Calendar)c.clone(); n.add(Calendar.DAY_OF_MONTH,7); return n.get(Calendar.MONTH)!=c.get(Calendar.MONTH); }
 
+    private Calendar paydayForPeriod(Calendar periodStart) {
+        Calendar anchorPeriod = Calendar.getInstance(); anchorPeriod.setTimeInMillis(prefs.getLong("pay_period_anchor", defaultAnchor())); zeroTime(anchorPeriod);
+        Calendar anchorPayday = Calendar.getInstance(); anchorPayday.setTimeInMillis(prefs.getLong("payday_anchor", defaultPayday())); zeroTime(anchorPayday);
+        int periods = Math.floorDiv((int)daysBetween(anchorPeriod.getTimeInMillis(), periodStart.getTimeInMillis()), 14);
+        anchorPayday.add(Calendar.DAY_OF_MONTH, periods * 14); return anchorPayday;
+    }
+
+    private int paycheckOccurrenceInMonth(Calendar payday) {
+        int count=1; Calendar c=(Calendar)payday.clone(); c.add(Calendar.DAY_OF_MONTH,-14);
+        while(c.get(Calendar.YEAR)==payday.get(Calendar.YEAR) && c.get(Calendar.MONTH)==payday.get(Calendar.MONTH)){ count++; c.add(Calendar.DAY_OF_MONTH,-14); }
+        return count;
+    }
+
+    private double estimateFederalWithholding(double biweeklyTaxable, String status) {
+        double annual = biweeklyTaxable * 26.0;
+        double deduction = status.equals(FEDERAL_STATUSES[1]) ? 32200 : status.equals(FEDERAL_STATUSES[2]) ? 24150 : 16100;
+        double taxable = Math.max(0, annual - deduction);
+        double tax;
+        if (status.equals(FEDERAL_STATUSES[1])) tax = bracketTax(taxable, new double[]{24800,100800,211400,403550,512450,768700}, new double[]{.10,.12,.22,.24,.32,.35,.37});
+        else if (status.equals(FEDERAL_STATUSES[2])) tax = bracketTax(taxable, new double[]{17700,67450,107000,203350,258350,640600}, new double[]{.10,.12,.22,.24,.32,.35,.37});
+        else tax = bracketTax(taxable, new double[]{12400,50400,105700,201775,256225,640600}, new double[]{.10,.12,.22,.24,.32,.35,.37});
+        return Math.max(0, tax / 26.0);
+    }
+
+    private double bracketTax(double income, double[] limits, double[] rates) {
+        double tax=0, prev=0;
+        for(int i=0;i<limits.length;i++){ double slice=Math.min(income,limits[i])-prev; if(slice>0) tax+=slice*rates[i]; if(income<=limits[i]) return tax; prev=limits[i]; }
+        return tax + Math.max(0,income-prev)*rates[rates.length-1];
+    }
+
+    private double estimateLouisianaWithholding(double biweeklyTaxable, String status) {
+        double annualExemption = status.equals(LOUISIANA_STATUSES[1]) ? 25000 : 12500;
+        return Math.max(0, ((biweeklyTaxable*26.0 - annualExemption) * .03) / 26.0);
+    }
+
     private void sharePayStubImage(Calendar start, Calendar end, double worked, double leave, double otHours, double regularPay, double otPay, double courtPay, double supplement, double gross) {
         try {
+            Calendar payday = paydayForPeriod(start);
+            boolean healthApplies = paycheckOccurrenceInMonth(payday) <= 2;
+            double health = healthApplies ? getDouble("health_deduction",0) : 0;
             double retirementBase = regularPay + supplement;
             double retirement = retirementBase * (getDouble("retirement_percent",0)/100.0);
-            double federal = getDouble("federal_extra",0);
-            double state = getDouble("state_extra",0);
+            double taxableGross = Math.max(0, gross-health);
+            double federal = estimateFederalWithholding(taxableGross, getString("federal_status",FEDERAL_STATUSES[0])) + getDouble("federal_extra",0);
+            double state = estimateLouisianaWithholding(taxableGross, getString("state_status",LOUISIANA_STATUSES[0])) + getDouble("state_extra",0);
             double other = getDouble("other_deductions",0);
-            double net = gross-retirement-federal-state-other;
+            double net = gross-health-retirement-federal-state-other;
             Bitmap bmp=Bitmap.createBitmap(1080,1350,Bitmap.Config.ARGB_8888); Canvas c=new Canvas(bmp); Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
             p.setColor(Color.rgb(5,14,25)); c.drawRect(0,0,1080,1350,p);
             p.setColor(Color.rgb(19,38,58)); c.drawRoundRect(new RectF(45,45,1035,1305),34,34,p);
@@ -756,6 +839,7 @@ public class MainActivity extends Activity {
             y=stubLine(c,p,"Court pay",money(courtPay),y);
             y=stubLine(c,p,"Supplemental pay",money(supplement),y);
             y=stubLine(c,p,"Gross pay",money(gross),y);
+            y=stubLine(c,p,"Health insurance",money(health),y);
             y=stubLine(c,p,"Retirement",money(retirement),y);
             y=stubLine(c,p,"Federal withholding",money(federal),y);
             y=stubLine(c,p,"Louisiana withholding",money(state),y);
@@ -858,35 +942,17 @@ public class MainActivity extends Activity {
 
     private void showSettingsScreen() {
         baseScreen("SETTINGS");
-
         content.addView(section("PROFILE & SCHEDULE"));
 
         EditText name = input("Officer/profile name", prefs.getString("officer_name", ""), false);
-
         Spinner pattern = new Spinner(this);
         pattern.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, PATTERNS));
         String current = prefs.getString("pattern", "Alpha");
-        for (int i = 0; i < PATTERNS.length; i++) {
-            if (PATTERNS[i].equals(current)) pattern.setSelection(i);
-        }
-
-        TextView anchor = action("PATTERN ANCHOR: " +
-                displayDate.format(new Date(prefs.getLong("anchor", defaultAnchor()))), null);
+        for (int i = 0; i < PATTERNS.length; i++) if (PATTERNS[i].equals(current)) pattern.setSelection(i);
 
         final long[] selectedAnchor = {prefs.getLong("anchor", defaultAnchor())};
-
-        anchor.setOnClickListener(v -> {
-            Calendar c = Calendar.getInstance();
-            c.setTimeInMillis(selectedAnchor[0]);
-            new DatePickerDialog(this, (view, y, m, d) -> {
-                Calendar chosen = Calendar.getInstance();
-                chosen.set(y, m, d, 0, 0, 0);
-                chosen.set(Calendar.MILLISECOND, 0);
-                selectedAnchor[0] = chosen.getTimeInMillis();
-                anchor.setText("PATTERN ANCHOR: " + displayDate.format(chosen.getTime()));
-            }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show();
-        });
-
+        TextView anchor = action("PATTERN ANCHOR: " + displayDate.format(new Date(selectedAnchor[0])), null);
+        anchor.setOnClickListener(v -> pickDate(selectedAnchor, anchor, "PATTERN ANCHOR: "));
         final long[] payPeriodAnchor = {prefs.getLong("pay_period_anchor", selectedAnchor[0])};
         final long[] paydayAnchor = {prefs.getLong("payday_anchor", defaultPayday())};
         TextView payPeriodButton = action("INITIAL PAY PERIOD START: " + displayDate.format(new Date(payPeriodAnchor[0])), null);
@@ -894,26 +960,38 @@ public class MainActivity extends Activity {
         TextView paydayButton = action("INITIAL PAYDAY: " + displayDate.format(new Date(paydayAnchor[0])), null);
         paydayButton.setOnClickListener(v -> pickDate(paydayAnchor, paydayButton, "INITIAL PAYDAY: "));
 
+        content.addView(labeledField("PROFILE NAME", name));
+        content.addView(labeledSpinner("SHIFT PATTERN", pattern));
+        content.addView(anchor); content.addView(payPeriodButton); content.addView(paydayButton);
+
+        content.addView(section("TAXES, RETIREMENT & DEDUCTIONS"));
+        Spinner federalStatus = new Spinner(this);
+        federalStatus.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, FEDERAL_STATUSES));
+        selectSpinner(federalStatus, FEDERAL_STATUSES, getString("federal_status", FEDERAL_STATUSES[0]));
+        Spinner stateStatus = new Spinner(this);
+        stateStatus.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, LOUISIANA_STATUSES));
+        selectSpinner(stateStatus, LOUISIANA_STATUSES, getString("state_status", LOUISIANA_STATUSES[0]));
+
         EditText retirement = input("Retirement percentage", formatRate(getDouble("retirement_percent", 0)), true);
-        EditText federalExtra = input("Additional federal withholding", formatRate(getDouble("federal_extra", 0)), true);
-        EditText stateExtra = input("Additional Louisiana withholding", formatRate(getDouble("state_extra", 0)), true);
+        EditText federalExtra = input("Extra federal dollars per check", formatRate(getDouble("federal_extra", 0)), true);
+        EditText stateExtra = input("Extra Louisiana dollars per check", formatRate(getDouble("state_extra", 0)), true);
+        EditText health = input("Health insurance per check", formatRate(getDouble("health_deduction", 0)), true);
         EditText deductions = input("Other deductions per check", formatRate(getDouble("other_deductions", 0)), true);
 
+        content.addView(labeledSpinner("FEDERAL FILING STATUS", federalStatus));
+        content.addView(labeledSpinner("LOUISIANA FILING STATUS", stateStatus));
+        content.addView(labeledField("RETIREMENT %", retirement));
+        content.addView(labeledField("ADDITIONAL FEDERAL WITHHOLDING", federalExtra));
+        content.addView(labeledField("ADDITIONAL LOUISIANA WITHHOLDING", stateExtra));
+        content.addView(labeledField("HEALTH — PRETAX, FIRST TWO CHECKS EACH MONTH", health));
+        content.addView(labeledField("OTHER DEDUCTIONS PER CHECK", deductions));
+
+        content.addView(section("LEAVE BANKS"));
         EditText vacation = input("Vacation starting balance", String.valueOf(getDouble("vacation_balance", 0)), true);
         EditText sick = input("Sick starting balance", String.valueOf(getDouble("sick_balance", 0)), true);
         EditText comp = input("Comp starting balance", String.valueOf(getDouble("comp_balance", 0)), true);
         EditText vacAcc = input("Vacation hours added each January 1", String.valueOf(getDouble("vacation_accrual", 0)), true);
         EditText sickAcc = input("Sick hours added each January 1", String.valueOf(getDouble("sick_accrual", 0)), true);
-
-        content.addView(name);
-        content.addView(pattern);
-        content.addView(anchor);
-        content.addView(payPeriodButton);
-        content.addView(paydayButton);
-        content.addView(labeledField("RETIREMENT %", retirement));
-        content.addView(labeledField("ADDITIONAL FEDERAL WITHHOLDING", federalExtra));
-        content.addView(labeledField("ADDITIONAL LOUISIANA WITHHOLDING", stateExtra));
-        content.addView(labeledField("OTHER DEDUCTIONS PER CHECK", deductions));
         content.addView(labeledField("VACATION STARTING BALANCE", vacation));
         content.addView(labeledField("SICK STARTING BALANCE", sick));
         content.addView(labeledField("COMP STARTING BALANCE", comp));
@@ -924,40 +1002,37 @@ public class MainActivity extends Activity {
             prefs.edit()
                     .putString("officer_name", name.getText().toString().trim())
                     .putString("pattern", PATTERNS[pattern.getSelectedItemPosition()])
-                    .putLong("anchor", selectedAnchor[0])
-                    .putLong("pay_period_anchor", payPeriodAnchor[0])
-                    .putLong("payday_anchor", paydayAnchor[0])
+                    .putLong("anchor", selectedAnchor[0]).putLong("pay_period_anchor", payPeriodAnchor[0]).putLong("payday_anchor", paydayAnchor[0])
+                    .putString("federal_status", FEDERAL_STATUSES[federalStatus.getSelectedItemPosition()])
+                    .putString("state_status", LOUISIANA_STATUSES[stateStatus.getSelectedItemPosition()])
                     .putString("retirement_percent", retirement.getText().toString())
-                    .putString("federal_extra", federalExtra.getText().toString())
-                    .putString("state_extra", stateExtra.getText().toString())
-                    .putString("other_deductions", deductions.getText().toString())
-                    .putString("vacation_balance", vacation.getText().toString())
-                    .putString("sick_balance", sick.getText().toString())
-                    .putString("comp_balance", comp.getText().toString())
-                    .putString("vacation_accrual", vacAcc.getText().toString())
-                    .putString("sick_accrual", sickAcc.getText().toString())
-                    .apply();
-
+                    .putString("federal_extra", federalExtra.getText().toString()).putString("state_extra", stateExtra.getText().toString())
+                    .putString("health_deduction", health.getText().toString()).putString("other_deductions", deductions.getText().toString())
+                    .putString("vacation_balance", vacation.getText().toString()).putString("sick_balance", sick.getText().toString())
+                    .putString("comp_balance", comp.getText().toString()).putString("vacation_accrual", vacAcc.getText().toString())
+                    .putString("sick_accrual", sickAcc.getText().toString()).apply();
             Toast.makeText(this, "Settings saved", Toast.LENGTH_SHORT).show();
             showCalendarScreen();
         }));
 
-        content.addView(action("CLEAR ALL MANUAL CALENDAR ENTRIES", v ->
-                new AlertDialog.Builder(this)
-                        .setTitle("Clear overrides?")
-                        .setMessage("Schedule settings and leave balances remain.")
-                        .setPositiveButton("Clear", (d, w) -> {
-                            SharedPreferences.Editor ed = prefs.edit();
-                            for (String key : prefs.getAll().keySet()) {
-                                if (key.startsWith("entry_")) ed.remove(key);
-                            }
-                            ed.apply();
-                            Toast.makeText(this, "Calendar overrides cleared", Toast.LENGTH_SHORT).show();
-                        })
-                        .setNegativeButton("Cancel", null)
-                        .show()
-        ));
+        content.addView(action("CLEAR ALL MANUAL CALENDAR ENTRIES", v -> new AlertDialog.Builder(this)
+                .setTitle("Clear overrides?").setMessage("Schedule settings and leave balances remain.")
+                .setPositiveButton("Clear", (d, w) -> {
+                    SharedPreferences.Editor ed = prefs.edit();
+                    for (String key : prefs.getAll().keySet()) if (key.startsWith("entry_") || key.startsWith("ot_hours_") || key.startsWith("comp_hours_") || key.startsWith("court_hours_")) ed.remove(key);
+                    ed.apply(); Toast.makeText(this, "Calendar entries cleared", Toast.LENGTH_SHORT).show();
+                }).setNegativeButton("Cancel", null).show()));
     }
+
+    private LinearLayout labeledSpinner(String label, Spinner spinner) {
+        LinearLayout wrap = new LinearLayout(this); wrap.setOrientation(LinearLayout.VERTICAL);
+        TextView lab = new TextView(this); lab.setText(label); lab.setTextColor(muted); lab.setTextSize(12); lab.setTypeface(Typeface.DEFAULT_BOLD); lab.setPadding(dp(3), dp(8), dp(3), dp(4));
+        spinner.setBackground(rounded(panel2, dp(8), Color.rgb(63,84,106), 1)); spinner.setPadding(dp(8),dp(5),dp(8),dp(5));
+        wrap.addView(lab); wrap.addView(spinner, new LinearLayout.LayoutParams(-1, dp(52))); return wrap;
+    }
+
+    private void selectSpinner(Spinner spinner, String[] options, String value) { for (int i=0;i<options.length;i++) if (options[i].equals(value)) spinner.setSelection(i); }
+    private String getString(String key, String fallback) { return prefs.getString(key, fallback); }
 
     private void addBalance(String key, double amount) {
         double current = getDouble(key, 0);
@@ -1044,15 +1119,15 @@ public class MainActivity extends Activity {
         }
 
         private void drawCruiser(Canvas c, int w, int h) {
-            float s=w/720f, x=w*.50f, y=h*.70f;
-            p.setColor(Color.rgb(6,8,12));
-            Path body=new Path(); body.moveTo(x-270*s,y+35*s); body.lineTo(x-205*s,y-20*s); body.lineTo(x-85*s,y-65*s); body.lineTo(x+120*s,y-62*s); body.lineTo(x+215*s,y-18*s); body.lineTo(x+280*s,y+6*s); body.lineTo(x+270*s,y+68*s); body.lineTo(x-250*s,y+68*s); body.close(); c.drawPath(body,p);
-            p.setColor(Color.rgb(25,31,39)); c.drawRoundRect(new RectF(x-185*s,y-46*s,x+155*s,y+18*s),18*s,18*s,p);
-            p.setColor(Color.rgb(5,12,20)); Path glass=new Path(); glass.moveTo(x-145*s,y-39*s); glass.lineTo(x-70*s,y-58*s); glass.lineTo(x+85*s,y-57*s); glass.lineTo(x+135*s,y-22*s); glass.lineTo(x-145*s,y-22*s); glass.close(); c.drawPath(glass,p);
-            p.setColor(Color.WHITE); p.setTypeface(Typeface.DEFAULT_BOLD); p.setTextAlign(Paint.Align.CENTER); p.setTextSize(34*s); c.drawText("POLICE",x+65*s,y+35*s,p);
-            p.setColor(Color.rgb(8,10,13)); c.drawCircle(x-165*s,y+62*s,43*s,p); c.drawCircle(x+180*s,y+62*s,43*s,p); p.setColor(Color.rgb(58,65,74)); c.drawCircle(x-165*s,y+62*s,21*s,p); c.drawCircle(x+180*s,y+62*s,21*s,p);
-            p.setColor(blue); c.drawRoundRect(new RectF(x-25*s,y-73*s,x+25*s,y-63*s),5*s,5*s,p); p.setColor(red); c.drawRoundRect(new RectF(x+28*s,y-73*s,x+78*s,y-63*s),5*s,5*s,p);
-            p.setColor(Color.rgb(60,67,76)); c.drawRect(x-245*s,y+40*s,x+245*s,y+48*s,p);
+            Bitmap car = BitmapFactory.decodeResource(getResources(), R.drawable.police_charger);
+            if (car == null) return;
+            Rect src = new Rect(0, 0, car.getWidth(), car.getHeight());
+            RectF dst = new RectF(dp(22), dp(58), w-dp(22), h-dp(4));
+            p.setAlpha(255);
+            c.drawBitmap(car, src, dst, p);
+            p.setAlpha(255);
+            p.setColor(Color.argb(80,0,0,0));
+            c.drawRoundRect(dst, dp(10), dp(10), p);
         }
     }
 
@@ -1109,27 +1184,18 @@ public class MainActivity extends Activity {
         }
 
         private void drawMoonOfficer(Canvas c, float x, float y, float r) {
-            p.setColor(Color.rgb(190, 199, 215));
+            p.setColor(Color.rgb(218, 224, 235));
             c.drawCircle(x, y, r, p);
-
-            p.setColor(Color.rgb(8, 18, 29));
-            c.drawCircle(x + r * .40f, y - r * .05f, r * .90f, p);
-
-            p.setColor(Color.rgb(142, 156, 180));
-            c.drawCircle(x - r * .38f, y - r * .26f, r * .10f, p);
-            c.drawCircle(x - r * .44f, y + r * .19f, r * .07f, p);
-
-            drawOfficerHat(c, x - r * .13f, y - r * .74f, r * .88f);
-
-            p.setColor(Color.WHITE);
-            c.drawCircle(x - r * .30f, y - r * .05f, r * .10f, p);
-            p.setColor(Color.rgb(21, 29, 39));
-            c.drawCircle(x - r * .28f, y - r * .04f, r * .045f, p);
-
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(dp(1));
-            p.setColor(Color.rgb(21, 29, 39));
-            c.drawArc(new RectF(x - r * .52f, y + r * .02f, x - r * .08f, y + r * .36f), 20, 140, false, p);
+            p.setColor(Color.rgb(176, 185, 201));
+            c.drawCircle(x-r*.35f, y-r*.30f, r*.12f, p);
+            c.drawCircle(x+r*.28f, y-r*.18f, r*.09f, p);
+            c.drawCircle(x-r*.18f, y+r*.28f, r*.08f, p);
+            drawOfficerHat(c, x, y-r*.78f, r);
+            p.setColor(Color.rgb(28,35,45));
+            c.drawCircle(x-r*.27f, y-r*.06f, r*.07f, p);
+            c.drawCircle(x+r*.27f, y-r*.06f, r*.07f, p);
+            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(dp(2));
+            c.drawArc(new RectF(x-r*.34f,y+r*.02f,x+r*.34f,y+r*.38f),20,140,false,p);
             p.setStyle(Paint.Style.FILL);
         }
 

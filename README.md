@@ -1,19 +1,14 @@
-# BOLO Board Native Android — UI and Payroll Rebuild
+# BOLO Board v1.4
 
-Version 1.2.0 changes:
+Native offline Android shift calendar and paycheck estimator for separate John and Alexis profiles.
 
-- Rebuilt police-cruiser header with windshield, hood, grille, headlights, and light bar
-- Cleaner day-shift police sun
-- Cleaner night-shift police moon
-- More compact calendar cells so the month fits better
-- Pay configuration fields shown directly on the Payroll screen:
-  - Hourly rate
-  - Overtime hourly rate
-  - Court pay per subpoena
-  - Supplemental pay per eligible check
-- Save-and-recalculate button
-- Regular pay, overtime pay, court pay, supplemental pay, and gross estimate displayed separately
-- Bottom navigation remains above Android system controls
-- Existing schedule, leave, comp, court, and local-storage functions retained
-
-Build using the included GitHub Actions workflow.
+## v1.4 changes
+- Multiple items can be recorded on one date without replacing the scheduled shift.
+- Add overtime, comp-requested time, and court hours to any workday or off day.
+- Payday remains a text marker and no longer replaces the shift icon.
+- Full-moon police officer icon for night shifts.
+- Federal and Louisiana filing-status selectors with automatic estimated withholding.
+- Additional federal and Louisiana withholding fields remain available.
+- Pretax Health deduction applies to the first two paychecks in each calendar month.
+- Dodge Charger police-car photo header.
+- Independent settings, calendars, payroll, leave banks, and paydays for each profile.
