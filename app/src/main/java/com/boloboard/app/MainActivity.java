@@ -18,6 +18,8 @@ import android.widget.*;
 
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import org.json.JSONObject;
 import org.json.JSONArray;
 
@@ -79,6 +81,21 @@ public class MainActivity extends Activity {
         SharedPreferences alexis = getSharedPreferences(PREFS + "_alexis", MODE_PRIVATE);
         if (!john.contains("officer_name")) john.edit().putString("officer_name", "J. Leger").putString("rank", "Lieutenant").apply();
         if (!alexis.contains("officer_name")) alexis.edit().putString("officer_name", "A. Leger").putString("rank", "Corporal").apply();
+        // Preserve editable rates, but migrate the rounded Alexis rates used by older builds
+        // to the exact values proven by the official 84-hour + 12-hour OT pay stub.
+        String alexisHourly = alexis.getString("hourly_rate", "");
+        String alexisOt = alexis.getString("overtime_rate", "");
+        SharedPreferences.Editor alexisRates = alexis.edit();
+        boolean updateAlexisRates = false;
+        if (alexisHourly.isEmpty() || alexisHourly.equals("20.26") || alexisHourly.equals("20.2600")) {
+            alexisRates.putString("hourly_rate", "20.260952380952");
+            updateAlexisRates = true;
+        }
+        if (alexisOt.isEmpty() || alexisOt.equals("30.39") || alexisOt.equals("30.3900")) {
+            alexisRates.putString("overtime_rate", "30.391666666667");
+            updateAlexisRates = true;
+        }
+        if (updateAlexisRates) alexisRates.apply();
     }
 
     private void switchProfile(String profile) {
@@ -619,8 +636,8 @@ public class MainActivity extends Activity {
 
         content.addView(section("PAY CONFIGURATION"));
 
-        EditText hourly = input("Hourly rate", formatRate(getDouble("hourly_rate", 0)), true);
-        EditText overtime = input("Overtime hourly rate", formatRate(getDouble("overtime_rate", 0)), true);
+        EditText hourly = input("Hourly rate", formatPayRate(getDouble("hourly_rate", 0)), true);
+        EditText overtime = input("Overtime hourly rate", formatPayRate(getDouble("overtime_rate", 0)), true);
         EditText court = input("Court pay per subpoena", formatRate(getDouble("court_rate", 50)), true);
         EditText supplement = input("Supplemental pay per eligible check", formatRate(getDouble("supplement", 0)), true);
 
@@ -683,12 +700,14 @@ public class MainActivity extends Activity {
         double courtRate = getDouble("court_rate", 0);
         double supplementRate = getDouble("supplement", 0);
 
-        double regularPay = (regularWorked + paidLeave) * hourlyRate;
-        double holidayPay = holidayHours * hourlyRate;
-        double overtimePay = overtimeHours * overtimeRate;
-        double courtPay = courtHours * courtRate;
-        double supplementalPay = isSupplementEligible(start) ? supplementRate : 0;
-        double gross = regularPay + holidayPay + overtimePay + courtPay + supplementalPay;
+        // Calculate each payroll earning with decimal arithmetic and round each pay code
+        // to cents before totaling, matching the agency pay-stub method.
+        double regularPay = moneyValue(bd(regularWorked + paidLeave).multiply(bd(hourlyRate)));
+        double holidayPay = moneyValue(bd(holidayHours).multiply(bd(hourlyRate)));
+        double overtimePay = moneyValue(bd(overtimeHours).multiply(bd(overtimeRate)));
+        double courtPay = moneyValue(bd(courtHours).multiply(bd(courtRate)));
+        double supplementalPay = moneyValue(bd(isSupplementEligible(start) ? supplementRate : 0));
+        double gross = moneyValue(bd(regularPay).add(bd(holidayPay)).add(bd(overtimePay)).add(bd(courtPay)).add(bd(supplementalPay)));
         final double compEarned = compOtHours * 1.5;
 
         Calendar paydayForPeriod = paydayForPeriod(start);
@@ -696,14 +715,15 @@ public class MainActivity extends Activity {
         double health = healthApplies ? getDouble("health_deduction", 0) : 0;
         double taxableGross = Math.max(0, gross - health);
         double retirementBase = regularPay + holidayPay + supplementalPay;
-        double retirement = roundMoney(retirementBase * (getDouble("retirement_percent", 0) / 100.0));
-        double federalTax = estimateFederalWithholding(gross, getString("federal_status", FEDERAL_STATUSES[0]),
-                (int)getDouble("federal_children", 0), (int)getDouble("federal_other_dependents", 0)) + getDouble("federal_extra", 0);
-        double stateTax = estimateLouisianaWithholding(gross, getString("state_status", LOUISIANA_STATUSES[0]),
-                (int)getDouble("state_dependents", 0)) + getDouble("state_extra", 0);
-        double medicare = roundMoney(gross * 0.0145);
-        double other = getDouble("other_deductions", 0);
-        double net = roundMoney(gross - health - retirement - federalTax - stateTax - medicare - other);
+        double retirement = moneyValue(bd(retirementBase).multiply(bd(getDouble("retirement_percent", 0))).divide(new BigDecimal("100"), 12, RoundingMode.HALF_UP));
+        double federalTax = moneyValue(bd(estimateFederalWithholding(gross, getString("federal_status", FEDERAL_STATUSES[0]),
+                (int)getDouble("federal_children", 0), (int)getDouble("federal_other_dependents", 0))).add(bd(getDouble("federal_extra", 0))));
+        double stateTax = moneyValue(bd(estimateLouisianaWithholding(gross, getString("state_status", LOUISIANA_STATUSES[0]),
+                (int)getDouble("state_dependents", 0))).add(bd(getDouble("state_extra", 0))));
+        double medicare = moneyValue(bd(gross).multiply(new BigDecimal("0.0145")));
+        double other = moneyValue(bd(getDouble("other_deductions", 0)));
+        double net = moneyValue(bd(gross).subtract(bd(health)).subtract(bd(retirement)).subtract(bd(federalTax))
+                .subtract(bd(stateTax)).subtract(bd(medicare)).subtract(bd(other)));
 
         content.addView(summaryCard("ACTUAL WORKED", actualWorked + " hrs", "⚡"));
         content.addView(summaryCard("PAID LEAVE", paidLeave + " hrs", "☂"));
@@ -890,7 +910,9 @@ public class MainActivity extends Activity {
         return roundMoney(Math.max(0, tax));
     }
 
-    private double roundMoney(double value) { return Math.round(value * 100.0) / 100.0; }
+    private BigDecimal bd(double value) { return new BigDecimal(Double.toString(value)); }
+    private double moneyValue(BigDecimal value) { return value.setScale(2, RoundingMode.HALF_UP).doubleValue(); }
+    private double roundMoney(double value) { return moneyValue(bd(value)); }
 
     private void savePayStubSnapshot(Calendar start, Calendar end, double worked, double leave, double otHours,
                                      double regularPay, double holidayPay, double otPay, double courtPay, double supplement, double gross) {
@@ -898,15 +920,15 @@ public class MainActivity extends Activity {
             Calendar payday = paydayForPeriod(start);
             boolean healthApplies = paycheckOccurrenceInMonth(payday) <= 2;
             double health = healthApplies ? getDouble("health_deduction",0) : 0;
-            double retirement = roundMoney((regularPay + holidayPay + supplement) * (getDouble("retirement_percent",0)/100.0));
+            double retirement = moneyValue(bd(regularPay + holidayPay + supplement).multiply(bd(getDouble("retirement_percent",0))).divide(new BigDecimal("100"), 12, RoundingMode.HALF_UP));
             double taxableGross = Math.max(0, gross-health);
             double federal = estimateFederalWithholding(gross, getString("federal_status",FEDERAL_STATUSES[0]),
                     (int)getDouble("federal_children",0), (int)getDouble("federal_other_dependents",0)) + getDouble("federal_extra",0);
             double state = estimateLouisianaWithholding(gross, getString("state_status",LOUISIANA_STATUSES[0]),
                     (int)getDouble("state_dependents",0)) + getDouble("state_extra",0);
-            double medicare = roundMoney(gross * 0.0145);
+            double medicare = moneyValue(bd(gross).multiply(new BigDecimal("0.0145")));
             double other = getDouble("other_deductions",0);
-            double net = roundMoney(gross-health-retirement-federal-state-medicare-other);
+            double net = moneyValue(bd(gross).subtract(bd(health)).subtract(bd(retirement)).subtract(bd(federal)).subtract(bd(state)).subtract(bd(medicare)).subtract(bd(other)));
             JSONObject o = new JSONObject();
             o.put("id", payday.getTimeInMillis()); o.put("payday", payday.getTimeInMillis());
             o.put("start", start.getTimeInMillis()); o.put("end", end.getTimeInMillis());
@@ -983,9 +1005,9 @@ public class MainActivity extends Activity {
                     (int)getDouble("federal_children",0), (int)getDouble("federal_other_dependents",0)) + getDouble("federal_extra",0);
             double state = estimateLouisianaWithholding(gross, getString("state_status",LOUISIANA_STATUSES[0]),
                     (int)getDouble("state_dependents",0)) + getDouble("state_extra",0);
-            double medicare = roundMoney(gross * 0.0145);
+            double medicare = moneyValue(bd(gross).multiply(new BigDecimal("0.0145")));
             double other = getDouble("other_deductions",0);
-            double net = roundMoney(gross-health-retirement-federal-state-medicare-other);
+            double net = moneyValue(bd(gross).subtract(bd(health)).subtract(bd(retirement)).subtract(bd(federal)).subtract(bd(state)).subtract(bd(medicare)).subtract(bd(other)));
             Bitmap bmp=Bitmap.createBitmap(1080,1350,Bitmap.Config.ARGB_8888); Canvas c=new Canvas(bmp); Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
             p.setColor(Color.rgb(5,14,25)); c.drawRect(0,0,1080,1350,p);
             p.setColor(Color.rgb(19,38,58)); c.drawRoundRect(new RectF(45,45,1035,1305),34,34,p);
@@ -1048,6 +1070,13 @@ public class MainActivity extends Activity {
         if (value == 0) return "";
         if (Math.rint(value) == value) return String.format(Locale.US, "%.0f", value);
         return String.format(Locale.US, "%.2f", value);
+    }
+
+    private String formatPayRate(double value) {
+        if (value == 0) return "";
+        String text = String.format(Locale.US, "%.12f", value);
+        while (text.contains(".") && text.endsWith("0")) text = text.substring(0, text.length() - 1);
+        return text.endsWith(".") ? text.substring(0, text.length() - 1) : text;
     }
 
     private LinearLayout summaryCard(String label, String value, String icon) {
