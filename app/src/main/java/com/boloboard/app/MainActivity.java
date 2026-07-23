@@ -1057,7 +1057,7 @@ public class MainActivity extends Activity {
             p.setTextAlign(Paint.Align.LEFT); p.setTextSize(27); p.setColor(silver);
             c.drawText("BANKS  •  Vacation "+formatHours(o.optDouble("vacation"))+"   Sick "+formatHours(o.optDouble("sick"))+"   Comp "+formatHours(o.optDouble("comp")),85,y+102,p);
             File dir=new File(getCacheDir(),"shared"); dir.mkdirs();
-            File f=new File(dir,"bolo-paystub-"+o.optLong("payday")+".png");
+            File f=new File(dir,"bolo-paystub-"+o.optLong("payday")+"-"+System.currentTimeMillis()+".png");
             FileOutputStream out=new FileOutputStream(f); bmp.compress(Bitmap.CompressFormat.PNG,100,out); out.close();
             Uri uri=FileProvider.getUriForFile(this,getPackageName()+".fileprovider",f);
             Intent send=new Intent(Intent.ACTION_SEND); send.setType("image/png");
@@ -1092,7 +1092,7 @@ public class MainActivity extends Activity {
             y=stubLine(c,p,"Health insurance",money(o.optDouble("health")),y); y=stubLine(c,p,"Retirement",money(o.optDouble("retirement")),y); y=stubLine(c,p,"Federal withholding",money(o.optDouble("federal")),y); y=stubLine(c,p,"Louisiana withholding",money(o.optDouble("state")),y); y=stubLine(c,p,"Other deductions",money(o.optDouble("other")),y);
             p.setColor(gold); p.setTextSize(46); p.setTypeface(Typeface.DEFAULT_BOLD); c.drawText("NET",85,y+40,p); p.setTextAlign(Paint.Align.RIGHT); c.drawText(money(o.optDouble("net")),995,y+40,p);
             p.setTextAlign(Paint.Align.LEFT); p.setTextSize(28); p.setColor(silver); c.drawText("BANKS  •  Vacation "+formatHours(o.optDouble("vacation"))+"   Sick "+formatHours(o.optDouble("sick"))+"   Comp "+formatHours(o.optDouble("comp")),85,y+105,p);
-            File dir=new File(getCacheDir(),"shared"); dir.mkdirs(); File f=new File(dir,"bolo-paystub-"+o.optLong("payday")+".png"); FileOutputStream out=new FileOutputStream(f); bmp.compress(Bitmap.CompressFormat.PNG,100,out); out.close();
+            File dir=new File(getCacheDir(),"shared"); dir.mkdirs(); File f=new File(dir,"bolo-paystub-"+o.optLong("payday")+"-"+System.currentTimeMillis()+".png"); FileOutputStream out=new FileOutputStream(f); bmp.compress(Bitmap.CompressFormat.PNG,100,out); out.close();
             Uri uri=FileProvider.getUriForFile(this,getPackageName()+".fileprovider",f); Intent send=new Intent(Intent.ACTION_SEND); send.setType("image/png"); send.putExtra(Intent.EXTRA_STREAM,uri); send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); startActivity(Intent.createChooser(send,"Share saved pay stub"));
         } catch(Exception e){ Toast.makeText(this,"Unable to create saved pay stub image",Toast.LENGTH_LONG).show(); }
     }
@@ -1348,48 +1348,40 @@ public class MainActivity extends Activity {
             c.drawRect(0, 0, w, h, p);
             p.setShader(null);
 
-            drawSkyline(c, w, h);
-            drawCruiser(c, w, h);
+            drawExplorerBanner(c, w, h);
+
+            // Dark top fade keeps the title readable over the supplied artwork.
+            p.setShader(new LinearGradient(0, 0, 0, dp(82), Color.argb(220, 0, 7, 15), Color.TRANSPARENT, Shader.TileMode.CLAMP));
+            c.drawRect(0, 0, w, dp(92), p);
+            p.setShader(null);
 
             p.setTextAlign(Paint.Align.CENTER);
             p.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
             p.setTextSize(dp(34));
-            p.setColor(Color.rgb(30, 34, 40));
-            c.drawText("BOLO BOARD", w / 2f + dp(2), dp(51) + dp(2), p);
+            p.setShadowLayer(dp(5), 0, dp(2), Color.BLACK);
             p.setColor(Color.WHITE);
             c.drawText("BOLO BOARD", w / 2f, dp(51), p);
+            p.clearShadowLayer();
         }
 
-        private void drawSkyline(Canvas c, int w, int h) {
-            p.setColor(Color.rgb(18, 34, 52));
-            int base = h - dp(5);
-            int[] heights = {56, 88, 72, 102, 64, 96, 78, 112, 70};
-            int bw = Math.max(dp(34), w / heights.length);
-            for (int i = 0; i < heights.length; i++) {
-                int left = i * bw;
-                int top = base - dp(heights[i]);
-                c.drawRect(left, top, left + bw - dp(6), base, p);
-                p.setColor(Color.rgb(170, 126, 35));
-                for (int wy = top + dp(12); wy < base - dp(8); wy += dp(18)) {
-                    c.drawRect(left + dp(8), wy, left + dp(12), wy + dp(5), p);
-                }
-                p.setColor(Color.rgb(18, 34, 52));
-            }
-        }
+        private void drawExplorerBanner(Canvas c, int w, int h) {
+            Bitmap banner = BitmapFactory.decodeResource(getResources(), R.drawable.police_explorer_banner);
+            if (banner == null) return;
 
-        private void drawCruiser(Canvas c, int w, int h) {
-            float left=dp(45), right=w-dp(45), top=dp(82), bottom=h-dp(18);
-            p.setShader(new LinearGradient(left,top,right,bottom,Color.rgb(25,31,40),Color.rgb(4,7,12),Shader.TileMode.CLAMP));
-            RectF body=new RectF(left,top+dp(24),right,bottom); c.drawRoundRect(body,dp(22),dp(22),p); p.setShader(null);
-            Path roof=new Path(); roof.moveTo(left+dp(85),top+dp(30)); roof.lineTo(left+dp(130),top); roof.lineTo(right-dp(90),top); roof.lineTo(right-dp(45),top+dp(30)); roof.close();
-            p.setColor(Color.rgb(18,25,34)); c.drawPath(roof,p);
-            p.setColor(Color.rgb(40,70,92)); c.drawRoundRect(new RectF(left+dp(112),top+dp(5),right-dp(105),top+dp(28)),dp(8),dp(8),p);
-            p.setColor(Color.WHITE); p.setTextSize(dp(17)); p.setTypeface(Typeface.DEFAULT_BOLD); p.setTextAlign(Paint.Align.CENTER); c.drawText("POLICE",w/2f,top+dp(58),p);
-            p.setColor(Color.rgb(18,18,20)); c.drawCircle(left+dp(75),bottom,dp(24),p); c.drawCircle(right-dp(75),bottom,dp(24),p);
-            p.setColor(Color.rgb(150,160,170)); c.drawCircle(left+dp(75),bottom,dp(10),p); c.drawCircle(right-dp(75),bottom,dp(10),p);
-            // stylized flashing light bar
-            p.setShadowLayer(dp(18),0,0,blue); p.setColor(blue); c.drawRect(w/2f-dp(38),top-dp(10),w/2f-dp(3),top,p);
-            p.setShadowLayer(dp(18),0,0,red); p.setColor(red); c.drawRect(w/2f+dp(3),top-dp(10),w/2f+dp(38),top,p); p.clearShadowLayer();
+            float scale = Math.max((float) w / banner.getWidth(), (float) h / banner.getHeight());
+            float scaledW = banner.getWidth() * scale;
+            float scaledH = banner.getHeight() * scale;
+            float left = (w - scaledW) / 2f;
+            float top = (h - scaledH) / 2f;
+
+            RectF destination = new RectF(left, top, left + scaledW, top + scaledH);
+            p.setFilterBitmap(true);
+            c.drawBitmap(banner, null, destination, p);
+
+            // Subtle dark overlay blends the artwork with the app's navy interface.
+            p.setShader(new LinearGradient(0, h * 0.35f, 0, h, Color.TRANSPARENT, Color.argb(135, 3, 12, 23), Shader.TileMode.CLAMP));
+            c.drawRect(0, 0, w, h, p);
+            p.setShader(null);
         }
     }
 

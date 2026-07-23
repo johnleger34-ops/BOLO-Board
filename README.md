@@ -1,3 +1,7 @@
-# BOLO Board v1.5.5
+# BOLO Board v1.5.6
 
-Fixes paycheck image sharing so both Share Current Paycheck Image and Previous Pay Stub > Share render the exact same immutable paycheck snapshot. The image generator no longer recalculates payroll or reads changing calendar/settings values. It includes overtime, holiday premium, Medicare, taxes, benefits, other deductions, net pay, and full pay-period dates.
+Fixes:
+- Uses the supplied Ford Explorer police artwork as the dashboard banner.
+- Both pay-stub share buttons use the saved/current snapshot data.
+- Each generated share image receives a unique filename and URI, preventing Android/MMS from displaying a cached older paycheck image.
+- Pay-period dates remain on a dedicated line.
