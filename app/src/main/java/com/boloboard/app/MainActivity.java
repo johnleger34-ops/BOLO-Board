@@ -32,16 +32,18 @@ public class MainActivity extends Activity {
     private TextView monthTitle;
     private GridLayout calendarGrid;
     private LinearLayout bottomNav;
+
     private final SimpleDateFormat keyFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
     private final SimpleDateFormat displayDate = new SimpleDateFormat("MMM d, yyyy", Locale.US);
 
-    private final int navy = Color.rgb(3, 14, 27);
-    private final int panel = Color.rgb(13, 24, 36);
-    private final int panel2 = Color.rgb(21, 35, 50);
-    private final int gold = Color.rgb(247, 190, 30);
-    private final int blue = Color.rgb(24, 124, 255);
-    private final int red = Color.rgb(238, 48, 58);
-    private final int silver = Color.rgb(214, 220, 228);
+    private final int navy = Color.rgb(3, 12, 23);
+    private final int panel = Color.rgb(13, 25, 39);
+    private final int panel2 = Color.rgb(22, 38, 55);
+    private final int gold = Color.rgb(246, 189, 31);
+    private final int blue = Color.rgb(31, 124, 255);
+    private final int red = Color.rgb(235, 51, 63);
+    private final int silver = Color.rgb(221, 227, 234);
+    private final int muted = Color.rgb(155, 169, 184);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,6 +53,10 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         applyAnnualAccrualIfNeeded();
         showCalendarScreen();
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private GradientDrawable rounded(int color, float radius, int strokeColor, int strokeWidth) {
@@ -67,7 +73,7 @@ public class MainActivity extends Activity {
         root.setBackgroundColor(navy);
 
         PoliceHeaderView header = new PoliceHeaderView(this);
-        root.addView(header, new LinearLayout.LayoutParams(-1, dp(180)));
+        root.addView(header, new LinearLayout.LayoutParams(-1, dp(190)));
 
         if (title != null && !title.isEmpty() && !title.equals("CALENDAR")) {
             TextView sectionTitle = new TextView(this);
@@ -94,8 +100,7 @@ public class MainActivity extends Activity {
         bottomNav = new LinearLayout(this);
         bottomNav.setOrientation(LinearLayout.HORIZONTAL);
         bottomNav.setGravity(Gravity.CENTER);
-        bottomNav.setPadding(dp(6), dp(7), dp(6), dp(7));
-        bottomNav.setBackground(rounded(Color.rgb(8,18,29), 0, Color.rgb(38,52,68), 1));
+        bottomNav.setBackground(rounded(Color.rgb(7, 18, 31), 0, Color.rgb(45, 62, 80), 1));
 
         addNavButton("▣\nCALENDAR", "Calendar");
         addNavButton("$\nPAYROLL", "Payroll");
@@ -124,7 +129,7 @@ public class MainActivity extends Activity {
         b.setTextSize(12);
         b.setTypeface(Typeface.DEFAULT_BOLD);
         b.setPadding(dp(4), dp(6), dp(4), dp(6));
-        b.setBackground(rounded(panel2, dp(8), Color.rgb(49,66,84), 1));
+        b.setBackground(rounded(panel2, dp(8), Color.rgb(55, 75, 96), 1));
         b.setOnClickListener(v -> {
             if (destination.equals("Calendar")) showCalendarScreen();
             else if (destination.equals("Payroll")) showPayrollScreen();
@@ -132,7 +137,7 @@ public class MainActivity extends Activity {
             else showSettingsScreen();
         });
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(66), 1);
-        lp.setMargins(dp(3),0,dp(3),0);
+        lp.setMargins(dp(3), 0, dp(3), 0);
         bottomNav.addView(b, lp);
     }
 
@@ -142,22 +147,24 @@ public class MainActivity extends Activity {
         t.setTextColor(Color.WHITE);
         t.setTextSize(19);
         t.setTypeface(Typeface.DEFAULT_BOLD);
-        t.setPadding(dp(10),dp(16),dp(10),dp(10));
+        t.setPadding(dp(10), dp(16), dp(10), dp(10));
         return t;
     }
 
     private EditText input(String label, String value, boolean numeric) {
         EditText e = new EditText(this);
         e.setHint(label);
-        e.setHintTextColor(Color.LTGRAY);
+        e.setHintTextColor(muted);
         e.setTextColor(Color.WHITE);
         e.setText(value);
         e.setSingleLine(true);
-        if (numeric) e.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED);
-        e.setPadding(dp(12),dp(11),dp(12),dp(11));
-        e.setBackground(rounded(panel2, dp(8), Color.rgb(62,82,104), 1));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1,-2);
-        lp.setMargins(0,dp(5),0,dp(5));
+        if (numeric) {
+            e.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED);
+        }
+        e.setPadding(dp(12), dp(11), dp(12), dp(11));
+        e.setBackground(rounded(panel2, dp(8), Color.rgb(63, 84, 106), 1));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(0, dp(5), 0, dp(5));
         e.setLayoutParams(lp);
         return e;
     }
@@ -169,13 +176,27 @@ public class MainActivity extends Activity {
         b.setTextSize(16);
         b.setTypeface(Typeface.DEFAULT_BOLD);
         b.setGravity(Gravity.CENTER);
-        b.setPadding(dp(12),dp(15),dp(12),dp(15));
-        b.setBackground(rounded(panel2, dp(9), Color.rgb(70,89,110), 1));
+        b.setPadding(dp(12), dp(15), dp(12), dp(15));
+        b.setBackground(rounded(panel2, dp(9), Color.rgb(70, 91, 112), 1));
         b.setOnClickListener(listener);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1,-2);
-        lp.setMargins(0,dp(6),0,dp(6));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(0, dp(6), 0, dp(6));
         b.setLayoutParams(lp);
         return b;
+    }
+
+    private LinearLayout labeledField(String label, EditText field) {
+        LinearLayout wrap = new LinearLayout(this);
+        wrap.setOrientation(LinearLayout.VERTICAL);
+        TextView lab = new TextView(this);
+        lab.setText(label);
+        lab.setTextColor(muted);
+        lab.setTextSize(12);
+        lab.setTypeface(Typeface.DEFAULT_BOLD);
+        lab.setPadding(dp(3), dp(8), dp(3), 0);
+        wrap.addView(lab);
+        wrap.addView(field);
+        return wrap;
     }
 
     private void showCalendarScreen() {
@@ -184,17 +205,17 @@ public class MainActivity extends Activity {
         LinearLayout scheduleRow = new LinearLayout(this);
         scheduleRow.setOrientation(LinearLayout.HORIZONTAL);
         scheduleRow.setGravity(Gravity.CENTER_VERTICAL);
-        scheduleRow.setPadding(dp(10),dp(9),dp(10),dp(9));
-        scheduleRow.setBackground(rounded(panel, dp(10), Color.rgb(76,91,106), 1));
+        scheduleRow.setPadding(dp(10), dp(9), dp(10), dp(9));
+        scheduleRow.setBackground(rounded(panel, dp(10), Color.rgb(76, 94, 113), 1));
 
         LinearLayout patternBox = new LinearLayout(this);
         patternBox.setOrientation(LinearLayout.VERTICAL);
         TextView pSmall = new TextView(this);
         pSmall.setText("YOUR SCHEDULE");
-        pSmall.setTextColor(Color.LTGRAY);
+        pSmall.setTextColor(muted);
         pSmall.setTextSize(10);
         TextView pBig = new TextView(this);
-        pBig.setText(prefs.getString("pattern","Alpha").toUpperCase(Locale.US) + "  ▼");
+        pBig.setText(prefs.getString("pattern", "Alpha").toUpperCase(Locale.US) + "  ▼");
         pBig.setTextColor(Color.WHITE);
         pBig.setTextSize(18);
         pBig.setTypeface(Typeface.DEFAULT_BOLD);
@@ -202,31 +223,37 @@ public class MainActivity extends Activity {
         patternBox.addView(pBig);
         patternBox.setOnClickListener(v -> showSettingsScreen());
 
-        TextView prev = arrowButton("◀", v -> { displayedMonth.add(Calendar.MONTH,-1); renderCalendar(); });
-        TextView next = arrowButton("▶", v -> { displayedMonth.add(Calendar.MONTH,1); renderCalendar(); });
+        TextView prev = arrowButton("◀", v -> {
+            displayedMonth.add(Calendar.MONTH, -1);
+            renderCalendar();
+        });
+        TextView next = arrowButton("▶", v -> {
+            displayedMonth.add(Calendar.MONTH, 1);
+            renderCalendar();
+        });
 
         monthTitle = new TextView(this);
-        monthTitle.setTextSize(23);
+        monthTitle.setTextSize(22);
         monthTitle.setTypeface(Typeface.DEFAULT_BOLD);
         monthTitle.setTextColor(Color.WHITE);
         monthTitle.setGravity(Gravity.CENTER);
 
-        scheduleRow.addView(patternBox, new LinearLayout.LayoutParams(dp(112),-2));
-        scheduleRow.addView(prev, new LinearLayout.LayoutParams(dp(52),dp(52)));
-        scheduleRow.addView(monthTitle, new LinearLayout.LayoutParams(0,-2,1));
-        scheduleRow.addView(next, new LinearLayout.LayoutParams(dp(52),dp(52)));
+        scheduleRow.addView(patternBox, new LinearLayout.LayoutParams(dp(110), -2));
+        scheduleRow.addView(prev, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        scheduleRow.addView(monthTitle, new LinearLayout.LayoutParams(0, -2, 1));
+        scheduleRow.addView(next, new LinearLayout.LayoutParams(dp(48), dp(48)));
         content.addView(scheduleRow);
 
         calendarGrid = new GridLayout(this);
         calendarGrid.setColumnCount(7);
-        calendarGrid.setBackgroundColor(Color.rgb(39,55,70));
-        LinearLayout.LayoutParams gridLp = new LinearLayout.LayoutParams(-1,-2);
-        gridLp.setMargins(0,dp(8),0,dp(8));
+        calendarGrid.setBackgroundColor(Color.rgb(39, 55, 70));
+        LinearLayout.LayoutParams gridLp = new LinearLayout.LayoutParams(-1, -2);
+        gridLp.setMargins(0, dp(8), 0, dp(8));
         calendarGrid.setLayoutParams(gridLp);
         content.addView(calendarGrid);
 
         TextView share = action("🚨   SHARE THIS MONTH   🚨", v -> shareMonth());
-        share.setBackground(rounded(Color.rgb(15,31,49), dp(9), blue, 2));
+        share.setBackground(rounded(Color.rgb(15, 31, 49), dp(9), blue, 2));
         content.addView(share);
         content.addView(action("⌖   JUMP TO TODAY", v -> {
             displayedMonth.setTime(new Date());
@@ -240,9 +267,9 @@ public class MainActivity extends Activity {
         TextView b = new TextView(this);
         b.setText(text);
         b.setTextColor(Color.WHITE);
-        b.setTextSize(22);
+        b.setTextSize(21);
         b.setGravity(Gravity.CENTER);
-        b.setBackground(rounded(panel2, dp(8), Color.rgb(92,106,122), 1));
+        b.setBackground(rounded(panel2, dp(8), Color.rgb(92, 106, 122), 1));
         b.setOnClickListener(listener);
         return b;
     }
@@ -251,56 +278,54 @@ public class MainActivity extends Activity {
         calendarGrid.removeAllViews();
         monthTitle.setText(new SimpleDateFormat("MMMM yyyy", Locale.US).format(displayedMonth.getTime()));
 
-        String[] days = {"SUN","MON","TUE","WED","THU","FRI","SAT"};
+        String[] days = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
         for (String d : days) {
             TextView h = new TextView(this);
             h.setText(d);
             h.setGravity(Gravity.CENTER);
             h.setTextColor(Color.WHITE);
-            h.setTextSize(11);
+            h.setTextSize(10);
             h.setTypeface(Typeface.DEFAULT_BOLD);
             h.setBackgroundColor(panel);
-            h.setPadding(0,dp(8),0,dp(8));
-            GridLayout.LayoutParams lp = equalGridParams(dp(38));
-            h.setLayoutParams(lp);
+            h.setPadding(0, dp(7), 0, dp(7));
+            h.setLayoutParams(equalGridParams(dp(34)));
             calendarGrid.addView(h);
         }
 
         Calendar first = (Calendar) displayedMonth.clone();
-        first.set(Calendar.DAY_OF_MONTH,1);
-        int start = first.get(Calendar.DAY_OF_WEEK)-1;
+        first.set(Calendar.DAY_OF_MONTH, 1);
+        int start = first.get(Calendar.DAY_OF_WEEK) - 1;
         int total = first.getActualMaximum(Calendar.DAY_OF_MONTH);
 
-        for (int i=0;i<start;i++) {
+        for (int i = 0; i < start; i++) {
             View empty = new View(this);
-            empty.setBackgroundColor(Color.rgb(5,13,22));
-            empty.setLayoutParams(equalGridParams(dp(82)));
+            empty.setBackgroundColor(Color.rgb(5, 13, 22));
+            empty.setLayoutParams(equalGridParams(dp(64)));
             calendarGrid.addView(empty);
         }
 
-        for (int d=1; d<=total; d++) {
+        for (int d = 1; d <= total; d++) {
             Calendar date = (Calendar) first.clone();
-            date.set(Calendar.DAY_OF_MONTH,d);
+            date.set(Calendar.DAY_OF_MONTH, d);
             String status = entryFor(date);
 
             FrameLayout cell = new FrameLayout(this);
-            cell.setBackground(rounded(Color.rgb(7,17,27), 0, Color.rgb(56,73,90), 1));
-            cell.setPadding(dp(2),dp(2),dp(2),dp(2));
-            cell.setLayoutParams(equalGridParams(dp(82)));
+            cell.setBackground(rounded(Color.rgb(7, 17, 27), 0, Color.rgb(56, 73, 90), 1));
+            cell.setPadding(dp(1), dp(1), dp(1), dp(1));
+            cell.setLayoutParams(equalGridParams(dp(64)));
 
             TextView number = new TextView(this);
             number.setText(String.valueOf(d));
             number.setTextColor(Color.WHITE);
-            number.setTextSize(13);
+            number.setTextSize(11);
             number.setTypeface(Typeface.DEFAULT_BOLD);
-            number.setPadding(dp(4),dp(2),0,0);
-            FrameLayout.LayoutParams numLp = new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.LEFT);
-            cell.addView(number,numLp);
+            number.setPadding(dp(3), dp(1), 0, 0);
+            cell.addView(number, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.LEFT));
 
             ShiftIconView icon = new ShiftIconView(this, status);
-            FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(-1,-1);
-            iconLp.setMargins(dp(3),dp(15),dp(3),dp(2));
-            cell.addView(icon,iconLp);
+            FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(-1, -1);
+            iconLp.setMargins(dp(2), dp(12), dp(2), dp(1));
+            cell.addView(icon, iconLp);
 
             cell.setOnClickListener(v -> editDate(date));
             calendarGrid.addView(cell);
@@ -311,8 +336,8 @@ public class MainActivity extends Activity {
         GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
         lp.width = 0;
         lp.height = dp(heightDp);
-        lp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED,1f);
-        lp.setMargins(1,1,1,1);
+        lp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
+        lp.setMargins(1, 1, 1, 1);
         return lp;
     }
 
@@ -320,34 +345,36 @@ public class MainActivity extends Activity {
         String key = "entry_" + keyFormat.format(date.getTime());
         int checked = 0;
         String current = prefs.getString(key, "Use Schedule");
-        for(int i=0;i<ENTRY_TYPES.length;i++) if(ENTRY_TYPES[i].equals(current)) checked=i;
+        for (int i = 0; i < ENTRY_TYPES.length; i++) {
+            if (ENTRY_TYPES[i].equals(current)) checked = i;
+        }
 
         new AlertDialog.Builder(this)
                 .setTitle(displayDate.format(date.getTime()))
                 .setSingleChoiceItems(ENTRY_TYPES, checked, null)
                 .setPositiveButton("Save", (dialog, which) -> {
-                    AlertDialog ad=(AlertDialog)dialog;
-                    int pos=ad.getListView().getCheckedItemPosition();
-                    String selected=ENTRY_TYPES[pos];
-                    SharedPreferences.Editor ed=prefs.edit();
-                    if(selected.equals("Use Schedule")) ed.remove(key);
-                    else ed.putString(key,selected);
+                    AlertDialog ad = (AlertDialog) dialog;
+                    int pos = ad.getListView().getCheckedItemPosition();
+                    String selected = ENTRY_TYPES[pos];
+                    SharedPreferences.Editor ed = prefs.edit();
+                    if (selected.equals("Use Schedule")) ed.remove(key);
+                    else ed.putString(key, selected);
                     ed.apply();
                     adjustLeaveForEntry(current, selected);
                     renderCalendar();
                 })
-                .setNegativeButton("Cancel",null)
+                .setNegativeButton("Cancel", null)
                 .show();
     }
 
     private void adjustLeaveForEntry(String oldValue, String newValue) {
         if (!oldValue.equals(newValue)) {
-            if (oldValue.equals("Vacation")) addBalance("vacation_balance",12);
-            if (oldValue.equals("Sick")) addBalance("sick_balance",12);
-            if (oldValue.equals("Comp Taken")) addBalance("comp_balance",12);
-            if (newValue.equals("Vacation")) addBalance("vacation_balance",-12);
-            if (newValue.equals("Sick")) addBalance("sick_balance",-12);
-            if (newValue.equals("Comp Taken")) addBalance("comp_balance",-12);
+            if (oldValue.equals("Vacation")) addBalance("vacation_balance", 12);
+            if (oldValue.equals("Sick")) addBalance("sick_balance", 12);
+            if (oldValue.equals("Comp Taken")) addBalance("comp_balance", 12);
+            if (newValue.equals("Vacation")) addBalance("vacation_balance", -12);
+            if (newValue.equals("Sick")) addBalance("sick_balance", -12);
+            if (newValue.equals("Comp Taken")) addBalance("comp_balance", -12);
         }
     }
 
@@ -357,434 +384,693 @@ public class MainActivity extends Activity {
     }
 
     private String scheduledFor(Calendar date) {
-        String pattern = prefs.getString("pattern","Alpha");
+        String pattern = prefs.getString("pattern", "Alpha");
         long anchor = prefs.getLong("anchor", defaultAnchor());
         long days = daysBetween(anchor, date.getTimeInMillis());
-        int cycleDay = floorMod((int)days,14);
-        boolean alphaWorks = cycleDay==0 || cycleDay==1 || cycleDay==4 || cycleDay==5 || cycleDay==6 ||
-                cycleDay==9 || cycleDay==10;
+        int cycleDay = floorMod((int) days, 14);
+        boolean alphaWorks = cycleDay == 0 || cycleDay == 1 || cycleDay == 4 || cycleDay == 5 || cycleDay == 6 ||
+                cycleDay == 9 || cycleDay == 10;
         boolean works = (pattern.equals("Alpha") || pattern.equals("Charlie")) ? alphaWorks : !alphaWorks;
         if (!works) return "Day Off";
         if (pattern.equals("Charlie") || pattern.equals("Delta")) {
-            int payPeriod = Math.floorDiv((int)days,14);
-            return floorMod(payPeriod,2)==0 ? "Night Shift" : "Day Shift";
+            int payPeriod = Math.floorDiv((int) days, 14);
+            return floorMod(payPeriod, 2) == 0 ? "Night Shift" : "Day Shift";
         }
         return "Day Shift";
     }
 
     private long defaultAnchor() {
-        Calendar c=Calendar.getInstance();
-        c.set(2026, Calendar.JULY,13,0,0,0);
-        c.set(Calendar.MILLISECOND,0);
+        Calendar c = Calendar.getInstance();
+        c.set(2026, Calendar.JULY, 13, 0, 0, 0);
+        c.set(Calendar.MILLISECOND, 0);
         return c.getTimeInMillis();
     }
 
     private long daysBetween(long start, long end) {
-        Calendar a=Calendar.getInstance(); a.setTimeInMillis(start); zeroTime(a);
-        Calendar b=Calendar.getInstance(); b.setTimeInMillis(end); zeroTime(b);
-        return (b.getTimeInMillis()-a.getTimeInMillis())/86400000L;
+        Calendar a = Calendar.getInstance();
+        a.setTimeInMillis(start);
+        zeroTime(a);
+        Calendar b = Calendar.getInstance();
+        b.setTimeInMillis(end);
+        zeroTime(b);
+        return (b.getTimeInMillis() - a.getTimeInMillis()) / 86400000L;
     }
 
     private void zeroTime(Calendar c) {
-        c.set(Calendar.HOUR_OF_DAY,0);c.set(Calendar.MINUTE,0);c.set(Calendar.SECOND,0);c.set(Calendar.MILLISECOND,0);
+        c.set(Calendar.HOUR_OF_DAY, 0);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
     }
 
     private int floorMod(int a, int b) {
-        int r=a%b; return r<0?r+b:r;
+        int r = a % b;
+        return r < 0 ? r + b : r;
     }
 
     private void shareMonth() {
-        Calendar first=(Calendar)displayedMonth.clone(); first.set(Calendar.DAY_OF_MONTH,1);
-        int total=first.getActualMaximum(Calendar.DAY_OF_MONTH);
-        StringBuilder sb=new StringBuilder();
-        sb.append(prefs.getString("officer_name","BOLO Board"))
-                .append(" — ").append(new SimpleDateFormat("MMMM yyyy",Locale.US).format(first.getTime())).append("\n\n");
-        for(int d=1;d<=total;d++){
-            first.set(Calendar.DAY_OF_MONTH,d);
-            sb.append(new SimpleDateFormat("EEE MMM d",Locale.US).format(first.getTime()))
-                    .append(": ").append(entryFor(first)).append("\n");
+        Calendar first = (Calendar) displayedMonth.clone();
+        first.set(Calendar.DAY_OF_MONTH, 1);
+        int total = first.getActualMaximum(Calendar.DAY_OF_MONTH);
+        StringBuilder sb = new StringBuilder();
+        sb.append(prefs.getString("officer_name", "BOLO Board"))
+                .append(" — ")
+                .append(new SimpleDateFormat("MMMM yyyy", Locale.US).format(first.getTime()))
+                .append("\n\n");
+        for (int d = 1; d <= total; d++) {
+            first.set(Calendar.DAY_OF_MONTH, d);
+            sb.append(new SimpleDateFormat("EEE MMM d", Locale.US).format(first.getTime()))
+                    .append(": ")
+                    .append(entryFor(first))
+                    .append("\n");
         }
-        Intent send=new Intent(Intent.ACTION_SEND);
+        Intent send = new Intent(Intent.ACTION_SEND);
         send.setType("text/plain");
-        send.putExtra(Intent.EXTRA_SUBJECT,"BOLO Board Monthly Schedule");
-        send.putExtra(Intent.EXTRA_TEXT,sb.toString());
-        startActivity(Intent.createChooser(send,"Share monthly schedule"));
+        send.putExtra(Intent.EXTRA_SUBJECT, "BOLO Board Monthly Schedule");
+        send.putExtra(Intent.EXTRA_TEXT, sb.toString());
+        startActivity(Intent.createChooser(send, "Share monthly schedule"));
     }
 
     private void showPayrollScreen() {
-        baseScreen("PAYROLL UNIT");
+        baseScreen("PAYROLL");
 
-        Calendar start=Calendar.getInstance();
-        start.setTimeInMillis(prefs.getLong("anchor",defaultAnchor()));
-        Calendar now=Calendar.getInstance();
-        long diff=daysBetween(start.getTimeInMillis(),now.getTimeInMillis());
-        int periods=Math.floorDiv((int)diff,14);
-        start.add(Calendar.DAY_OF_MONTH, periods*14);
-        Calendar end=(Calendar)start.clone(); end.add(Calendar.DAY_OF_MONTH,13);
+        content.addView(section("PAY CONFIGURATION"));
 
-        content.addView(section("CURRENT PAY PERIOD\n"+displayDate.format(start.getTime())+" – "+displayDate.format(end.getTime())));
+        EditText hourly = input("Hourly rate", formatRate(getDouble("hourly_rate", 0)), true);
+        EditText overtime = input("Overtime hourly rate", formatRate(getDouble("overtime_rate", 0)), true);
+        EditText court = input("Court pay per subpoena", formatRate(getDouble("court_rate", 50)), true);
+        EditText supplement = input("Supplemental pay per eligible check", formatRate(getDouble("supplement", 0)), true);
 
-        double worked=0, paidLeave=0, straightExtra=0, otRequested=0, compRequested=0;
-        int subpoenas=0;
-        Calendar cursor=(Calendar)start.clone();
-        for(int i=0;i<14;i++){
-            String e=entryFor(cursor);
-            if(e.equals("Day Shift")||e.equals("Night Shift")) worked+=12;
-            else if(e.equals("Extra Shift - Regular")) straightExtra+=12;
-            else if(e.equals("Extra Shift - OT Requested")) otRequested+=12;
-            else if(e.equals("Extra Shift - Comp Requested")) compRequested+=12;
-            else if(e.equals("Vacation")||e.equals("Sick")||e.equals("Comp Taken")) paidLeave+=12;
-            else if(e.equals("Court")) subpoenas++;
-            cursor.add(Calendar.DAY_OF_MONTH,1);
+        content.addView(labeledField("HOURLY RATE", hourly));
+        content.addView(labeledField("OVERTIME RATE", overtime));
+        content.addView(labeledField("COURT PAY PER SUBPOENA", court));
+        content.addView(labeledField("SUPPLEMENTAL PAY", supplement));
+
+        TextView saveRates = action("SAVE PAY RATES & RECALCULATE", v -> {
+            prefs.edit()
+                    .putString("hourly_rate", hourly.getText().toString())
+                    .putString("overtime_rate", overtime.getText().toString())
+                    .putString("court_rate", court.getText().toString())
+                    .putString("supplement", supplement.getText().toString())
+                    .apply();
+            Toast.makeText(this, "Pay rates saved", Toast.LENGTH_SHORT).show();
+            showPayrollScreen();
+        });
+        saveRates.setBackground(rounded(Color.rgb(17, 71, 122), dp(9), blue, 2));
+        content.addView(saveRates);
+
+        Calendar start = currentPayPeriodStart();
+        Calendar end = (Calendar) start.clone();
+        end.add(Calendar.DAY_OF_MONTH, 13);
+
+        content.addView(section("CURRENT PAY PERIOD\n" + displayDate.format(start.getTime()) + " – " + displayDate.format(end.getTime())));
+
+        double worked = 0;
+        double paidLeave = 0;
+        double straightExtra = 0;
+        double otRequested = 0;
+        double compRequested = 0;
+        int subpoenas = 0;
+
+        Calendar cursor = (Calendar) start.clone();
+        for (int i = 0; i < 14; i++) {
+            String e = entryFor(cursor);
+            if (e.equals("Day Shift") || e.equals("Night Shift")) worked += 12;
+            else if (e.equals("Extra Shift - Regular")) straightExtra += 12;
+            else if (e.equals("Extra Shift - OT Requested")) otRequested += 12;
+            else if (e.equals("Extra Shift - Comp Requested")) compRequested += 12;
+            else if (e.equals("Vacation") || e.equals("Sick") || e.equals("Comp Taken")) paidLeave += 12;
+            else if (e.equals("Court")) subpoenas++;
+            cursor.add(Calendar.DAY_OF_MONTH, 1);
         }
 
-        double actualWorked=worked+straightExtra+otRequested+compRequested;
-        double overtime=Math.max(0,actualWorked-84);
-        double regularWorked=actualWorked-overtime;
-        double hourly=getDouble("hourly_rate",0);
-        double regularPay=(regularWorked+paidLeave)*hourly;
-        double overtimePay=overtime*hourly*1.5;
-        double courtPay=Math.min(3,subpoenas)*50.0;
-        int paycheckIndex=paycheckIndexFor(start);
-        double supplement=paycheckIndex<=2?getDouble("supplement",0):0;
-        double gross=regularPay+overtimePay+courtPay+supplement;
+        double actualWorked = worked + straightExtra + otRequested + compRequested;
+        double overtimeHours = Math.max(0, actualWorked - 84);
+        double regularWorked = actualWorked - overtimeHours;
+        double hourlyRate = getDouble("hourly_rate", 0);
+        double overtimeRate = getDouble("overtime_rate", 0);
+        if (overtimeRate <= 0 && hourlyRate > 0) overtimeRate = hourlyRate * 1.5;
+        double courtRate = getDouble("court_rate", 50);
+        double supplementRate = getDouble("supplement", 0);
 
-        double beforeComp=Math.max(0,84-(worked+straightExtra+otRequested));
-        double straightComp=Math.min(compRequested,beforeComp);
-        double overtimeComp=Math.max(0,compRequested-straightComp);
-        final double compEarned=straightComp+(overtimeComp*1.5);
+        double regularPay = (regularWorked + paidLeave) * hourlyRate;
+        double overtimePay = overtimeHours * overtimeRate;
+        double courtPay = Math.min(3, subpoenas) * courtRate;
+        double supplementalPay = isSupplementEligible(start) ? supplementRate : 0;
+        double gross = regularPay + overtimePay + courtPay + supplementalPay;
 
-        content.addView(summaryCard("ACTUAL WORKED", actualWorked+" hrs", "⚡"));
-        content.addView(summaryCard("PAID LEAVE", paidLeave+" hrs", "☂"));
-        content.addView(summaryCard("OVERTIME", overtime+" hrs", "⏱"));
-        content.addView(summaryCard("COMP EARNED", compEarned+" hrs", "★"));
+        double beforeComp = Math.max(0, 84 - (worked + straightExtra + otRequested));
+        double straightComp = Math.min(compRequested, beforeComp);
+        double overtimeComp = Math.max(0, compRequested - straightComp);
+        final double compEarned = straightComp + (overtimeComp * 1.5);
+
+        content.addView(summaryCard("ACTUAL WORKED", actualWorked + " hrs", "⚡"));
+        content.addView(summaryCard("PAID LEAVE", paidLeave + " hrs", "☂"));
+        content.addView(summaryCard("REGULAR PAY", money(regularPay), "$"));
+        content.addView(summaryCard("OVERTIME", overtimeHours + " hrs  •  " + money(overtimePay), "⏱"));
+        content.addView(summaryCard("COMP EARNED", compEarned + " hrs", "★"));
         content.addView(summaryCard("COURT PAY", money(courtPay), "⚖"));
-        content.addView(summaryCard("STATE SUPPLEMENT", money(supplement), "✦"));
-        content.addView(summaryCard("ESTIMATED GROSS", money(gross), "$"));
+        content.addView(summaryCard("SUPPLEMENTAL PAY", money(supplementalPay), "✦"));
+        content.addView(summaryCard("ESTIMATED GROSS CHECK", money(gross), "$"));
 
-        if(compEarned>0) {
-            content.addView(action("ADD EARNED COMP TO BANK",v->{
-                addBalance("comp_balance",compEarned);
-                Toast.makeText(this,"Comp bank updated",Toast.LENGTH_SHORT).show();
+        if (compEarned > 0) {
+            content.addView(action("ADD EARNED COMP TO BANK", v -> {
+                addBalance("comp_balance", compEarned);
+                Toast.makeText(this, "Comp bank updated", Toast.LENGTH_SHORT).show();
                 showPayrollScreen();
             }));
         }
 
         final double actualWorkedFinal = actualWorked;
         final double paidLeaveFinal = paidLeave;
-        final double overtimeFinal = overtime;
+        final double overtimeHoursFinal = overtimeHours;
+        final double regularPayFinal = regularPay;
+        final double overtimePayFinal = overtimePay;
         final double courtPayFinal = courtPay;
-        final double supplementFinal = supplement;
+        final double supplementalPayFinal = supplementalPay;
         final double grossFinal = gross;
         final Calendar startFinal = (Calendar) start.clone();
         final Calendar endFinal = (Calendar) end.clone();
 
-        content.addView(action("SHARE PAYCHECK SUMMARY",v->{
-            String text="BOLO Board Paycheck Estimate\n"+
-                    displayDate.format(startFinal.getTime())+" – "+displayDate.format(endFinal.getTime())+"\n"+
-                    "Actual worked: "+actualWorkedFinal+" hrs\nPaid leave: "+paidLeaveFinal+" hrs\n"+
-                    "Overtime: "+overtimeFinal+" hrs\nCourt: "+money(courtPayFinal)+"\n"+
-                    "Supplement: "+money(supplementFinal)+"\nEstimated gross: "+money(grossFinal);
-            Intent send=new Intent(Intent.ACTION_SEND);send.setType("text/plain");
-            send.putExtra(Intent.EXTRA_TEXT,text);startActivity(Intent.createChooser(send,"Share paycheck summary"));
+        content.addView(action("SHARE PAYCHECK SUMMARY", v -> {
+            String text = "BOLO Board Paycheck Estimate\n" +
+                    displayDate.format(startFinal.getTime()) + " – " + displayDate.format(endFinal.getTime()) + "\n" +
+                    "Actual worked: " + actualWorkedFinal + " hrs\n" +
+                    "Paid leave: " + paidLeaveFinal + " hrs\n" +
+                    "Regular pay: " + money(regularPayFinal) + "\n" +
+                    "Overtime: " + overtimeHoursFinal + " hrs / " + money(overtimePayFinal) + "\n" +
+                    "Court: " + money(courtPayFinal) + "\n" +
+                    "Supplement: " + money(supplementalPayFinal) + "\n" +
+                    "Estimated gross: " + money(grossFinal);
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType("text/plain");
+            send.putExtra(Intent.EXTRA_TEXT, text);
+            startActivity(Intent.createChooser(send, "Share paycheck summary"));
         }));
+    }
+
+    private Calendar currentPayPeriodStart() {
+        Calendar start = Calendar.getInstance();
+        start.setTimeInMillis(prefs.getLong("anchor", defaultAnchor()));
+        Calendar now = Calendar.getInstance();
+        long diff = daysBetween(start.getTimeInMillis(), now.getTimeInMillis());
+        int periods = Math.floorDiv((int) diff, 14);
+        start.add(Calendar.DAY_OF_MONTH, periods * 14);
+        return start;
+    }
+
+    private boolean isSupplementEligible(Calendar periodStart) {
+        Calendar payday = (Calendar) periodStart.clone();
+        payday.add(Calendar.DAY_OF_MONTH, 15);
+        zeroTime(payday);
+
+        Calendar firstKnownPayday = Calendar.getInstance();
+        firstKnownPayday.set(2026, Calendar.JULY, 28, 0, 0, 0);
+        firstKnownPayday.set(Calendar.MILLISECOND, 0);
+
+        long difference = daysBetween(firstKnownPayday.getTimeInMillis(), payday.getTimeInMillis());
+        int sequence = Math.floorDiv((int) difference, 14);
+
+        Calendar candidate = (Calendar) firstKnownPayday.clone();
+        candidate.add(Calendar.DAY_OF_MONTH, sequence * 14);
+
+        while (candidate.after(payday)) candidate.add(Calendar.DAY_OF_MONTH, -14);
+        while (candidate.before(payday)) candidate.add(Calendar.DAY_OF_MONTH, 14);
+
+        int occurrence = 1;
+        Calendar previous = (Calendar) candidate.clone();
+        previous.add(Calendar.DAY_OF_MONTH, -14);
+        while (previous.get(Calendar.YEAR) == candidate.get(Calendar.YEAR) &&
+                previous.get(Calendar.MONTH) == candidate.get(Calendar.MONTH)) {
+            occurrence++;
+            previous.add(Calendar.DAY_OF_MONTH, -14);
+        }
+
+        return occurrence <= 2;
+    }
+
+    private String formatRate(double value) {
+        if (value == 0) return "";
+        if (Math.rint(value) == value) return String.format(Locale.US, "%.0f", value);
+        return String.format(Locale.US, "%.2f", value);
     }
 
     private LinearLayout summaryCard(String label, String value, String icon) {
         LinearLayout card = new LinearLayout(this);
         card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(14),dp(13),dp(14),dp(13));
-        card.setBackground(rounded(panel, dp(9), Color.rgb(56,75,94), 1));
-        TextView i = new TextView(this); i.setText(icon); i.setTextSize(28); i.setTextColor(gold); i.setGravity(Gravity.CENTER);
-        LinearLayout words = new LinearLayout(this); words.setOrientation(LinearLayout.VERTICAL); words.setPadding(dp(12),0,0,0);
-        TextView l = new TextView(this); l.setText(label); l.setTextColor(Color.LTGRAY); l.setTextSize(12);
-        TextView v = new TextView(this); v.setText(value); v.setTextColor(Color.WHITE); v.setTextSize(21); v.setTypeface(Typeface.DEFAULT_BOLD);
-        words.addView(l); words.addView(v);
-        card.addView(i,new LinearLayout.LayoutParams(dp(46),-1));
-        card.addView(words,new LinearLayout.LayoutParams(0,-2,1));
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2); lp.setMargins(0,dp(5),0,dp(5)); card.setLayoutParams(lp);
+        card.setPadding(dp(14), dp(13), dp(14), dp(13));
+        card.setBackground(rounded(panel, dp(9), Color.rgb(56, 75, 94), 1));
+
+        TextView i = new TextView(this);
+        i.setText(icon);
+        i.setTextSize(28);
+        i.setTextColor(gold);
+        i.setGravity(Gravity.CENTER);
+
+        LinearLayout words = new LinearLayout(this);
+        words.setOrientation(LinearLayout.VERTICAL);
+        words.setPadding(dp(12), 0, 0, 0);
+
+        TextView l = new TextView(this);
+        l.setText(label);
+        l.setTextColor(muted);
+        l.setTextSize(12);
+
+        TextView v = new TextView(this);
+        v.setText(value);
+        v.setTextColor(Color.WHITE);
+        v.setTextSize(21);
+        v.setTypeface(Typeface.DEFAULT_BOLD);
+
+        words.addView(l);
+        words.addView(v);
+        card.addView(i, new LinearLayout.LayoutParams(dp(46), -1));
+        card.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(0, dp(5), 0, dp(5));
+        card.setLayoutParams(lp);
         return card;
     }
 
-    private int paycheckIndexFor(Calendar periodStart) {
-        Calendar pay=(Calendar)periodStart.clone(); pay.add(Calendar.DAY_OF_MONTH,15);
-        return pay.get(Calendar.DAY_OF_MONTH)<=15?1:2;
-    }
-
     private String money(double v) {
-        return String.format(Locale.US,"$%,.2f",v);
+        return String.format(Locale.US, "$%,.2f", v);
     }
 
     private void showLeaveScreen() {
         baseScreen("LEAVE BANKS");
-        content.addView(summaryCard("VACATION",formatHours(getDouble("vacation_balance",0)),"☀"));
-        content.addView(summaryCard("SICK",formatHours(getDouble("sick_balance",0)),"✚"));
-        content.addView(summaryCard("COMP",formatHours(getDouble("comp_balance",0)),"★"));
+        content.addView(summaryCard("VACATION", formatHours(getDouble("vacation_balance", 0)), "☀"));
+        content.addView(summaryCard("SICK", formatHours(getDouble("sick_balance", 0)), "✚"));
+        content.addView(summaryCard("COMP", formatHours(getDouble("comp_balance", 0)), "★"));
 
         content.addView(section("MANUAL ADJUSTMENT"));
-        Spinner bank=new Spinner(this);
-        bank.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,
-                new String[]{"Vacation","Sick","Comp"}));
-        EditText amount=input("Hours to add (negative subtracts)","",true);
-        content.addView(bank); content.addView(amount);
-        content.addView(action("APPLY ADJUSTMENT",v->{
-            double h=parse(amount.getText().toString());
-            String key=bank.getSelectedItemPosition()==0?"vacation_balance":
-                    bank.getSelectedItemPosition()==1?"sick_balance":"comp_balance";
-            addBalance(key,h);
+
+        Spinner bank = new Spinner(this);
+        bank.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item,
+                new String[]{"Vacation", "Sick", "Comp"}));
+
+        EditText amount = input("Hours to add (negative subtracts)", "", true);
+        content.addView(bank);
+        content.addView(amount);
+
+        content.addView(action("APPLY ADJUSTMENT", v -> {
+            double h = parse(amount.getText().toString());
+            String key = bank.getSelectedItemPosition() == 0 ? "vacation_balance" :
+                    bank.getSelectedItemPosition() == 1 ? "sick_balance" : "comp_balance";
+            addBalance(key, h);
             showLeaveScreen();
         }));
 
         content.addView(section("JANUARY 1 ACCRUAL"));
-        content.addView(summaryCard("VACATION ACCRUAL",formatHours(getDouble("vacation_accrual",0)),"+"));
-        content.addView(summaryCard("SICK ACCRUAL",formatHours(getDouble("sick_accrual",0)),"+"));
+        content.addView(summaryCard("VACATION ACCRUAL", formatHours(getDouble("vacation_accrual", 0)), "+"));
+        content.addView(summaryCard("SICK ACCRUAL", formatHours(getDouble("sick_accrual", 0)), "+"));
     }
 
-    private String formatHours(double h){return String.format(Locale.US,"%.1f hrs",h);}
+    private String formatHours(double h) {
+        return String.format(Locale.US, "%.1f hrs", h);
+    }
 
     private void showSettingsScreen() {
-        baseScreen("COMMAND SETTINGS");
+        baseScreen("SETTINGS");
 
-        EditText name=input("Officer/profile name",prefs.getString("officer_name",""),false);
-        Spinner pattern=new Spinner(this);
-        pattern.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,PATTERNS));
-        String current=prefs.getString("pattern","Alpha");
-        for(int i=0;i<PATTERNS.length;i++)if(PATTERNS[i].equals(current))pattern.setSelection(i);
+        content.addView(section("PROFILE & SCHEDULE"));
 
-        TextView anchor=action("PATTERN ANCHOR: "+displayDate.format(new Date(prefs.getLong("anchor",defaultAnchor()))),null);
-        final long[] selectedAnchor={prefs.getLong("anchor",defaultAnchor())};
-        anchor.setOnClickListener(v->{
-            Calendar c=Calendar.getInstance();c.setTimeInMillis(selectedAnchor[0]);
-            new DatePickerDialog(this,(view,y,m,d)->{
-                Calendar chosen=Calendar.getInstance();chosen.set(y,m,d,0,0,0);chosen.set(Calendar.MILLISECOND,0);
-                selectedAnchor[0]=chosen.getTimeInMillis();
-                anchor.setText("PATTERN ANCHOR: "+displayDate.format(chosen.getTime()));
-            },c.get(Calendar.YEAR),c.get(Calendar.MONTH),c.get(Calendar.DAY_OF_MONTH)).show();
+        EditText name = input("Officer/profile name", prefs.getString("officer_name", ""), false);
+
+        Spinner pattern = new Spinner(this);
+        pattern.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, PATTERNS));
+        String current = prefs.getString("pattern", "Alpha");
+        for (int i = 0; i < PATTERNS.length; i++) {
+            if (PATTERNS[i].equals(current)) pattern.setSelection(i);
+        }
+
+        TextView anchor = action("PATTERN ANCHOR: " +
+                displayDate.format(new Date(prefs.getLong("anchor", defaultAnchor()))), null);
+
+        final long[] selectedAnchor = {prefs.getLong("anchor", defaultAnchor())};
+
+        anchor.setOnClickListener(v -> {
+            Calendar c = Calendar.getInstance();
+            c.setTimeInMillis(selectedAnchor[0]);
+            new DatePickerDialog(this, (view, y, m, d) -> {
+                Calendar chosen = Calendar.getInstance();
+                chosen.set(y, m, d, 0, 0, 0);
+                chosen.set(Calendar.MILLISECOND, 0);
+                selectedAnchor[0] = chosen.getTimeInMillis();
+                anchor.setText("PATTERN ANCHOR: " + displayDate.format(chosen.getTime()));
+            }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show();
         });
 
-        EditText hourly=input("Hourly rate",String.valueOf(getDouble("hourly_rate",0)),true);
-        EditText supplement=input("State supplemental pay per eligible check",String.valueOf(getDouble("supplement",0)),true);
-        EditText vacation=input("Vacation starting balance",String.valueOf(getDouble("vacation_balance",0)),true);
-        EditText sick=input("Sick starting balance",String.valueOf(getDouble("sick_balance",0)),true);
-        EditText comp=input("Comp starting balance",String.valueOf(getDouble("comp_balance",0)),true);
-        EditText vacAcc=input("Vacation hours added each January 1",String.valueOf(getDouble("vacation_accrual",0)),true);
-        EditText sickAcc=input("Sick hours added each January 1",String.valueOf(getDouble("sick_accrual",0)),true);
+        EditText vacation = input("Vacation starting balance", String.valueOf(getDouble("vacation_balance", 0)), true);
+        EditText sick = input("Sick starting balance", String.valueOf(getDouble("sick_balance", 0)), true);
+        EditText comp = input("Comp starting balance", String.valueOf(getDouble("comp_balance", 0)), true);
+        EditText vacAcc = input("Vacation hours added each January 1", String.valueOf(getDouble("vacation_accrual", 0)), true);
+        EditText sickAcc = input("Sick hours added each January 1", String.valueOf(getDouble("sick_accrual", 0)), true);
 
-        content.addView(name);content.addView(pattern);content.addView(anchor);
-        content.addView(hourly);content.addView(supplement);
-        content.addView(vacation);content.addView(sick);content.addView(comp);
-        content.addView(vacAcc);content.addView(sickAcc);
+        content.addView(name);
+        content.addView(pattern);
+        content.addView(anchor);
+        content.addView(vacation);
+        content.addView(sick);
+        content.addView(comp);
+        content.addView(vacAcc);
+        content.addView(sickAcc);
 
-        content.addView(action("SAVE SETTINGS",v->{
+        content.addView(action("SAVE SETTINGS", v -> {
             prefs.edit()
-                    .putString("officer_name",name.getText().toString().trim())
-                    .putString("pattern",PATTERNS[pattern.getSelectedItemPosition()])
-                    .putLong("anchor",selectedAnchor[0])
-                    .putString("hourly_rate",hourly.getText().toString())
-                    .putString("supplement",supplement.getText().toString())
-                    .putString("vacation_balance",vacation.getText().toString())
-                    .putString("sick_balance",sick.getText().toString())
-                    .putString("comp_balance",comp.getText().toString())
-                    .putString("vacation_accrual",vacAcc.getText().toString())
-                    .putString("sick_accrual",sickAcc.getText().toString())
+                    .putString("officer_name", name.getText().toString().trim())
+                    .putString("pattern", PATTERNS[pattern.getSelectedItemPosition()])
+                    .putLong("anchor", selectedAnchor[0])
+                    .putString("vacation_balance", vacation.getText().toString())
+                    .putString("sick_balance", sick.getText().toString())
+                    .putString("comp_balance", comp.getText().toString())
+                    .putString("vacation_accrual", vacAcc.getText().toString())
+                    .putString("sick_accrual", sickAcc.getText().toString())
                     .apply();
-            Toast.makeText(this,"Settings saved",Toast.LENGTH_SHORT).show();
+
+            Toast.makeText(this, "Settings saved", Toast.LENGTH_SHORT).show();
             showCalendarScreen();
         }));
 
-        content.addView(action("CLEAR ALL MANUAL CALENDAR ENTRIES",v->
-                new AlertDialog.Builder(this).setTitle("Clear overrides?")
+        content.addView(action("CLEAR ALL MANUAL CALENDAR ENTRIES", v ->
+                new AlertDialog.Builder(this)
+                        .setTitle("Clear overrides?")
                         .setMessage("Schedule settings and leave balances remain.")
-                        .setPositiveButton("Clear",(d,w)->{
-                            SharedPreferences.Editor ed=prefs.edit();
-                            for(String key:prefs.getAll().keySet()) if(key.startsWith("entry_")) ed.remove(key);
-                            ed.apply();Toast.makeText(this,"Calendar overrides cleared",Toast.LENGTH_SHORT).show();
-                        }).setNegativeButton("Cancel",null).show()
+                        .setPositiveButton("Clear", (d, w) -> {
+                            SharedPreferences.Editor ed = prefs.edit();
+                            for (String key : prefs.getAll().keySet()) {
+                                if (key.startsWith("entry_")) ed.remove(key);
+                            }
+                            ed.apply();
+                            Toast.makeText(this, "Calendar overrides cleared", Toast.LENGTH_SHORT).show();
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show()
         ));
     }
 
-    private void addBalance(String key,double amount) {
-        double current=getDouble(key,0);
-        prefs.edit().putString(key,String.valueOf(current+amount)).apply();
+    private void addBalance(String key, double amount) {
+        double current = getDouble(key, 0);
+        prefs.edit().putString(key, String.valueOf(current + amount)).apply();
     }
 
-    private double getDouble(String key,double fallback) {
-        try{return Double.parseDouble(prefs.getString(key,String.valueOf(fallback)));}
-        catch(Exception e){return fallback;}
-    }
-
-    private double parse(String value) {
-        try{return Double.parseDouble(value.trim());}catch(Exception e){return 0;}
-    }
-
-    private void applyAnnualAccrualIfNeeded() {
-        Calendar now=Calendar.getInstance();
-        int year=now.get(Calendar.YEAR);
-        int applied=prefs.getInt("accrual_applied_year",0);
-        if(applied<year) {
-            addBalance("vacation_balance",getDouble("vacation_accrual",0));
-            addBalance("sick_balance",getDouble("sick_accrual",0));
-            prefs.edit().putInt("accrual_applied_year",year).apply();
+    private double getDouble(String key, double fallback) {
+        try {
+            return Double.parseDouble(prefs.getString(key, String.valueOf(fallback)));
+        } catch (Exception e) {
+            return fallback;
         }
     }
 
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
+    private double parse(String value) {
+        try {
+            return Double.parseDouble(value.trim());
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private void applyAnnualAccrualIfNeeded() {
+        Calendar now = Calendar.getInstance();
+        int year = now.get(Calendar.YEAR);
+        int applied = prefs.getInt("accrual_applied_year", 0);
+        if (applied < year) {
+            addBalance("vacation_balance", getDouble("vacation_accrual", 0));
+            addBalance("sick_balance", getDouble("sick_accrual", 0));
+            prefs.edit().putInt("accrual_applied_year", year).apply();
+        }
     }
 
     private class PoliceHeaderView extends View {
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        public PoliceHeaderView(Activity c) { super(c); }
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-        @Override protected void onDraw(Canvas c) {
+        PoliceHeaderView(Activity c) {
+            super(c);
+        }
+
+        @Override
+        protected void onDraw(Canvas c) {
             super.onDraw(c);
-            int w=getWidth(), h=getHeight();
-            LinearGradient bg=new LinearGradient(0,0,0,h,Color.rgb(4,10,18),Color.rgb(7,24,42),Shader.TileMode.CLAMP);
-            p.setShader(bg); c.drawRect(0,0,w,h,p); p.setShader(null);
+            int w = getWidth();
+            int h = getHeight();
 
-            // city lights
-            p.setColor(Color.rgb(18,32,49));
-            for(int x=0;x<w;x+=dp(38)) {
-                int bh=dp(45)+(x%dp(70));
-                c.drawRect(x,h-bh,x+dp(28),h,p);
-                p.setColor(Color.rgb(150,112,35));
-                c.drawRect(x+dp(6),h-bh+dp(10),x+dp(10),h-bh+dp(14),p);
-                p.setColor(Color.rgb(18,32,49));
+            LinearGradient bg = new LinearGradient(
+                    0, 0, 0, h,
+                    Color.rgb(2, 8, 15),
+                    Color.rgb(8, 28, 49),
+                    Shader.TileMode.CLAMP
+            );
+            p.setShader(bg);
+            c.drawRect(0, 0, w, h, p);
+            p.setShader(null);
+
+            drawSkyline(c, w, h);
+            drawCruiser(c, w, h);
+
+            p.setTextAlign(Paint.Align.CENTER);
+            p.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+            p.setTextSize(dp(34));
+            p.setColor(Color.rgb(30, 34, 40));
+            c.drawText("BOLO BOARD", w / 2f + dp(2), dp(51) + dp(2), p);
+            p.setColor(Color.WHITE);
+            c.drawText("BOLO BOARD", w / 2f, dp(51), p);
+        }
+
+        private void drawSkyline(Canvas c, int w, int h) {
+            p.setColor(Color.rgb(18, 34, 52));
+            int base = h - dp(5);
+            int[] heights = {56, 88, 72, 102, 64, 96, 78, 112, 70};
+            int bw = Math.max(dp(34), w / heights.length);
+            for (int i = 0; i < heights.length; i++) {
+                int left = i * bw;
+                int top = base - dp(heights[i]);
+                c.drawRect(left, top, left + bw - dp(6), base, p);
+                p.setColor(Color.rgb(170, 126, 35));
+                for (int wy = top + dp(12); wy < base - dp(8); wy += dp(18)) {
+                    c.drawRect(left + dp(8), wy, left + dp(12), wy + dp(5), p);
+                }
+                p.setColor(Color.rgb(18, 34, 52));
+            }
+        }
+
+        private void drawCruiser(Canvas c, int w, int h) {
+            float cx = w / 2f;
+            float top = dp(78);
+            float bottom = h - dp(8);
+            float carW = w * .72f;
+
+            p.setColor(Color.rgb(5, 8, 12));
+            RectF roof = new RectF(cx - carW * .28f, top + dp(8), cx + carW * .28f, top + dp(53));
+            c.drawRoundRect(roof, dp(18), dp(18), p);
+
+            p.setColor(Color.rgb(13, 22, 31));
+            RectF windshield = new RectF(cx - carW * .23f, top + dp(15), cx + carW * .23f, top + dp(47));
+            c.drawRoundRect(windshield, dp(8), dp(8), p);
+
+            p.setColor(Color.rgb(7, 11, 16));
+            RectF body = new RectF(cx - carW * .5f, top + dp(44), cx + carW * .5f, bottom);
+            c.drawRoundRect(body, dp(22), dp(22), p);
+
+            p.setColor(Color.rgb(28, 35, 43));
+            RectF hood = new RectF(cx - carW * .42f, top + dp(54), cx + carW * .42f, bottom - dp(10));
+            c.drawRoundRect(hood, dp(16), dp(16), p);
+
+            p.setColor(Color.rgb(5, 8, 12));
+            c.drawRoundRect(new RectF(cx - carW * .29f, bottom - dp(27), cx + carW * .29f, bottom - dp(8)), dp(6), dp(6), p);
+
+            p.setColor(Color.rgb(110, 122, 134));
+            for (int i = -2; i <= 2; i++) {
+                float gx = cx + i * dp(23);
+                c.drawRect(gx - dp(7), bottom - dp(25), gx + dp(7), bottom - dp(11), p);
             }
 
-            // police car
-            float cy=h-dp(30);
-            p.setColor(Color.rgb(8,12,17));
-            RectF body=new RectF(w*.18f,cy-dp(45),w*.82f,cy+dp(16));
-            c.drawRoundRect(body,dp(16),dp(16),p);
-            p.setColor(Color.rgb(16,25,34));
-            Path roof=new Path(); roof.moveTo(w*.34f,cy-dp(45)); roof.lineTo(w*.43f,cy-dp(75)); roof.lineTo(w*.64f,cy-dp(75)); roof.lineTo(w*.72f,cy-dp(45)); roof.close(); c.drawPath(roof,p);
-            p.setColor(Color.WHITE); c.drawCircle(w*.24f,cy,dp(7),p); c.drawCircle(w*.76f,cy,dp(7),p);
-            p.setColor(blue); c.drawRect(w*.46f,cy-dp(82),w*.53f,cy-dp(72),p);
-            p.setColor(red); c.drawRect(w*.54f,cy-dp(82),w*.61f,cy-dp(72),p);
-
-            // title
-            p.setTextAlign(Paint.Align.CENTER);
-            p.setTypeface(Typeface.create(Typeface.DEFAULT,Typeface.BOLD));
-            p.setTextSize(dp(33));
-            p.setColor(Color.rgb(35,39,44));
-            c.drawText("BOLO BOARD",w/2f+dp(2),dp(54)+dp(2),p);
             p.setColor(Color.WHITE);
-            c.drawText("BOLO BOARD",w/2f,dp(54),p);
+            c.drawOval(new RectF(cx - carW * .43f, bottom - dp(35), cx - carW * .28f, bottom - dp(17)), p);
+            c.drawOval(new RectF(cx + carW * .28f, bottom - dp(35), cx + carW * .43f, bottom - dp(17)), p);
 
-            // light glow bars
-            p.setColor(blue); c.drawRect(w*.35f,dp(72),w*.49f,dp(77),p);
-            p.setColor(red); c.drawRect(w*.51f,dp(72),w*.65f,dp(77),p);
+            p.setColor(blue);
+            c.drawRoundRect(new RectF(cx - dp(60), top - dp(2), cx - dp(3), top + dp(9)), dp(4), dp(4), p);
+            p.setColor(red);
+            c.drawRoundRect(new RectF(cx + dp(3), top - dp(2), cx + dp(60), top + dp(9)), dp(4), dp(4), p);
+
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(dp(2));
+            p.setColor(Color.rgb(80, 92, 105));
+            c.drawRoundRect(body, dp(22), dp(22), p);
+            p.setStyle(Paint.Style.FILL);
         }
     }
 
     private class ShiftIconView extends View {
         private final String status;
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        ShiftIconView(Activity c, String status) { super(c); this.status=status; }
 
-        @Override protected void onDraw(Canvas c) {
+        ShiftIconView(Activity c, String status) {
+            super(c);
+            this.status = status;
+        }
+
+        @Override
+        protected void onDraw(Canvas c) {
             super.onDraw(c);
-            float w=getWidth(), h=getHeight(), cx=w/2f;
-            if (status.equals("Day Shift")) drawSunOfficer(c,cx,h*.42f,Math.min(w,h)*.27f);
-            else if (status.equals("Night Shift")) drawMoonOfficer(c,cx,h*.42f,Math.min(w,h)*.27f);
-            else if (status.equals("Vacation")) drawVacationCar(c,cx,h*.40f,Math.min(w,h)*.28f);
-            else if (status.equals("Day Off")) drawOffBadge(c,cx,h*.42f,Math.min(w,h)*.24f);
-            else drawSpecial(c,cx,h*.42f,Math.min(w,h)*.25f,status);
+            float w = getWidth();
+            float h = getHeight();
+            float cx = w / 2f;
+            float r = Math.min(w, h) * .24f;
+
+            if (status.equals("Day Shift")) drawSunOfficer(c, cx, h * .42f, r);
+            else if (status.equals("Night Shift")) drawMoonOfficer(c, cx, h * .42f, r);
+            else if (status.equals("Vacation")) drawVacationCar(c, cx, h * .42f, r);
+            else if (status.equals("Day Off")) drawOffBadge(c, cx, h * .42f, r);
+            else drawSpecial(c, cx, h * .42f, r, status);
 
             p.setTextAlign(Paint.Align.CENTER);
             p.setTypeface(Typeface.DEFAULT_BOLD);
-            p.setTextSize(dp(9));
+            p.setTextSize(dp(8));
             p.setColor(labelColor(status));
-            c.drawText(shortLabel(status),cx,h-dp(3),p);
+            c.drawText(shortLabel(status), cx, h - dp(2), p);
         }
 
-        private void drawSunOfficer(Canvas c,float x,float y,float r) {
+        private void drawSunOfficer(Canvas c, float x, float y, float r) {
             p.setColor(gold);
-            for(int i=0;i<12;i++){
-                double a=i*Math.PI/6;
-                float x1=(float)(x+Math.cos(a)*r*1.05), y1=(float)(y+Math.sin(a)*r*1.05);
-                float x2=(float)(x+Math.cos(a)*r*1.35), y2=(float)(y+Math.sin(a)*r*1.35);
-                p.setStrokeWidth(dp(3)); c.drawLine(x1,y1,x2,y2,p);
+            p.setStrokeWidth(dp(2));
+            for (int i = 0; i < 12; i++) {
+                double a = i * Math.PI / 6;
+                float x1 = (float) (x + Math.cos(a) * r * 1.02);
+                float y1 = (float) (y + Math.sin(a) * r * 1.02);
+                float x2 = (float) (x + Math.cos(a) * r * 1.28);
+                float y2 = (float) (y + Math.sin(a) * r * 1.28);
+                c.drawLine(x1, y1, x2, y2, p);
             }
-            c.drawCircle(x,y,r,p);
-            drawFace(c,x,y,r,true);
-            drawHat(c,x,y-r*.78f,r);
-        }
-
-        private void drawMoonOfficer(Canvas c,float x,float y,float r) {
-            p.setColor(Color.rgb(176,188,208)); c.drawCircle(x,y,r,p);
-            p.setColor(Color.rgb(7,17,27)); c.drawCircle(x+r*.38f,y-r*.08f,r*.88f,p);
-            p.setColor(Color.rgb(139,157,188)); c.drawCircle(x-r*.38f,y-r*.3f,r*.10f,p); c.drawCircle(x-r*.48f,y+r*.22f,r*.07f,p);
-            drawFace(c,x-r*.18f,y,r*.78f,false);
-            drawHat(c,x-r*.10f,y-r*.76f,r*.9f);
-        }
-
-        private void drawFace(Canvas c,float x,float y,float r,boolean shades) {
-            if(shades){
-                p.setColor(Color.BLACK);
-                c.drawRoundRect(new RectF(x-r*.72f,y-r*.25f,x-r*.08f,y+r*.05f),r*.1f,r*.1f,p);
-                c.drawRoundRect(new RectF(x+r*.08f,y-r*.25f,x+r*.72f,y+r*.05f),r*.1f,r*.1f,p);
-                c.drawRect(x-r*.08f,y-r*.16f,x+r*.08f,y-r*.10f,p);
-            } else {
-                p.setColor(Color.WHITE); c.drawCircle(x-r*.28f,y-r*.08f,r*.13f,p); c.drawCircle(x+r*.28f,y-r*.08f,r*.13f,p);
-                p.setColor(Color.BLACK); c.drawCircle(x-r*.25f,y-r*.06f,r*.06f,p); c.drawCircle(x+r*.25f,y-r*.06f,r*.06f,p);
-            }
-            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(dp(2)); p.setColor(Color.BLACK);
-            RectF smile=new RectF(x-r*.42f,y-r*.05f,x+r*.42f,y+r*.50f); c.drawArc(smile,20,140,false,p);
+            c.drawCircle(x, y, r, p);
+            drawOfficerHat(c, x, y - r * .72f, r);
+            p.setColor(Color.rgb(28, 28, 28));
+            c.drawCircle(x - r * .28f, y - r * .08f, r * .08f, p);
+            c.drawCircle(x + r * .28f, y - r * .08f, r * .08f, p);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(dp(2));
+            c.drawArc(new RectF(x - r * .35f, y - r * .02f, x + r * .35f, y + r * .42f), 20, 140, false, p);
             p.setStyle(Paint.Style.FILL);
         }
 
-        private void drawHat(Canvas c,float x,float y,float r) {
-            p.setColor(Color.rgb(8,29,60));
-            RectF crown=new RectF(x-r*.55f,y-r*.28f,x+r*.55f,y+r*.26f);
-            c.drawRoundRect(crown,r*.18f,r*.18f,p);
-            c.drawOval(new RectF(x-r*.76f,y+r*.14f,x+r*.76f,y+r*.42f),p);
-            p.setColor(gold); c.drawCircle(x,y,r*.14f,p);
-            p.setColor(Color.WHITE); p.setTextAlign(Paint.Align.CENTER); p.setTextSize(r*.18f); p.setTypeface(Typeface.DEFAULT_BOLD); c.drawText("★",x,y+r*.07f,p);
+        private void drawMoonOfficer(Canvas c, float x, float y, float r) {
+            p.setColor(Color.rgb(190, 199, 215));
+            c.drawCircle(x, y, r, p);
+
+            p.setColor(Color.rgb(8, 18, 29));
+            c.drawCircle(x + r * .40f, y - r * .05f, r * .90f, p);
+
+            p.setColor(Color.rgb(142, 156, 180));
+            c.drawCircle(x - r * .38f, y - r * .26f, r * .10f, p);
+            c.drawCircle(x - r * .44f, y + r * .19f, r * .07f, p);
+
+            drawOfficerHat(c, x - r * .13f, y - r * .74f, r * .88f);
+
+            p.setColor(Color.WHITE);
+            c.drawCircle(x - r * .30f, y - r * .05f, r * .10f, p);
+            p.setColor(Color.rgb(21, 29, 39));
+            c.drawCircle(x - r * .28f, y - r * .04f, r * .045f, p);
+
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(dp(1));
+            p.setColor(Color.rgb(21, 29, 39));
+            c.drawArc(new RectF(x - r * .52f, y + r * .02f, x - r * .08f, y + r * .36f), 20, 140, false, p);
+            p.setStyle(Paint.Style.FILL);
         }
 
-        private void drawVacationCar(Canvas c,float x,float y,float r) {
-            p.setColor(Color.rgb(220,224,230));
-            c.drawRoundRect(new RectF(x-r,y-r*.35f,x+r,y+r*.35f),r*.18f,r*.18f,p);
-            p.setColor(Color.rgb(18,25,35));
-            Path roof=new Path(); roof.moveTo(x-r*.45f,y-r*.35f); roof.lineTo(x-r*.2f,y-r*.75f); roof.lineTo(x+r*.45f,y-r*.75f); roof.lineTo(x+r*.7f,y-r*.35f); roof.close(); c.drawPath(roof,p);
-            p.setColor(Color.BLACK); c.drawCircle(x-r*.58f,y+r*.34f,r*.22f,p); c.drawCircle(x+r*.58f,y+r*.34f,r*.22f,p);
-            p.setColor(blue); c.drawRect(x-r*.12f,y-r*.88f,x,y-r*.73f,p);
-            p.setColor(red); c.drawRect(x,y-r*.88f,x+r*.12f,y-r*.73f,p);
-            p.setColor(Color.rgb(255,225,90));
-            RectF note=new RectF(x-r*.30f,y-r*.10f,x+r*.70f,y+r*.72f);
-            c.save(); c.rotate(-8,x+r*.2f,y+r*.3f); c.drawRect(note,p);
-            p.setColor(Color.BLACK); p.setTextAlign(Paint.Align.CENTER); p.setTypeface(Typeface.DEFAULT_BOLD); p.setTextSize(r*.18f);
-            c.drawText("ON",x+r*.2f,y+r*.17f,p); c.drawText("VACATION",x+r*.2f,y+r*.40f,p); c.restore();
+        private void drawOfficerHat(Canvas c, float x, float y, float r) {
+            p.setColor(Color.rgb(6, 32, 65));
+            c.drawRoundRect(new RectF(x - r * .52f, y - r * .18f, x + r * .52f, y + r * .22f),
+                    r * .15f, r * .15f, p);
+            c.drawOval(new RectF(x - r * .73f, y + r * .10f, x + r * .73f, y + r * .31f), p);
+            p.setColor(gold);
+            c.drawCircle(x, y + r * .01f, r * .12f, p);
+            p.setColor(Color.WHITE);
+            p.setTextAlign(Paint.Align.CENTER);
+            p.setTextSize(r * .16f);
+            p.setTypeface(Typeface.DEFAULT_BOLD);
+            c.drawText("★", x, y + r * .06f, p);
         }
 
-        private void drawOffBadge(Canvas c,float x,float y,float r) {
-            p.setColor(Color.rgb(62,72,84));
-            Path star=new Path();
-            for(int i=0;i<16;i++){
-                double a=-Math.PI/2+i*Math.PI/8;
-                float rr=(i%2==0)?r:r*.68f;
-                float px=(float)(x+Math.cos(a)*rr), py=(float)(y+Math.sin(a)*rr);
-                if(i==0)star.moveTo(px,py); else star.lineTo(px,py);
+        private void drawVacationCar(Canvas c, float x, float y, float r) {
+            p.setColor(Color.rgb(226, 230, 235));
+            c.drawRoundRect(new RectF(x - r, y - r * .30f, x + r, y + r * .28f), r * .18f, r * .18f, p);
+
+            p.setColor(Color.rgb(16, 24, 34));
+            Path roof = new Path();
+            roof.moveTo(x - r * .46f, y - r * .30f);
+            roof.lineTo(x - r * .22f, y - r * .68f);
+            roof.lineTo(x + r * .42f, y - r * .68f);
+            roof.lineTo(x + r * .67f, y - r * .30f);
+            roof.close();
+            c.drawPath(roof, p);
+
+            p.setColor(Color.BLACK);
+            c.drawCircle(x - r * .58f, y + r * .30f, r * .20f, p);
+            c.drawCircle(x + r * .58f, y + r * .30f, r * .20f, p);
+
+            p.setColor(blue);
+            c.drawRect(x - r * .12f, y - r * .81f, x, y - r * .68f, p);
+            p.setColor(red);
+            c.drawRect(x, y - r * .81f, x + r * .12f, y - r * .68f, p);
+
+            p.setColor(Color.rgb(255, 225, 92));
+            c.save();
+            c.rotate(-8, x + r * .20f, y + r * .24f);
+            c.drawRect(new RectF(x - r * .25f, y - r * .02f, x + r * .70f, y + r * .65f), p);
+            p.setColor(Color.BLACK);
+            p.setTextAlign(Paint.Align.CENTER);
+            p.setTypeface(Typeface.DEFAULT_BOLD);
+            p.setTextSize(r * .17f);
+            c.drawText("ON", x + r * .22f, y + r * .20f, p);
+            c.drawText("VACATION", x + r * .22f, y + r * .42f, p);
+            c.restore();
+        }
+
+        private void drawOffBadge(Canvas c, float x, float y, float r) {
+            p.setColor(Color.rgb(64, 75, 88));
+            Path star = new Path();
+            for (int i = 0; i < 16; i++) {
+                double a = -Math.PI / 2 + i * Math.PI / 8;
+                float rr = (i % 2 == 0) ? r : r * .68f;
+                float px = (float) (x + Math.cos(a) * rr);
+                float py = (float) (y + Math.sin(a) * rr);
+                if (i == 0) star.moveTo(px, py);
+                else star.lineTo(px, py);
             }
-            star.close(); c.drawPath(star,p);
-            p.setColor(Color.LTGRAY); p.setTextAlign(Paint.Align.CENTER); p.setTypeface(Typeface.DEFAULT_BOLD); p.setTextSize(r*.42f); c.drawText("OFF",x,y+r*.14f,p);
+            star.close();
+            c.drawPath(star, p);
+
+            p.setColor(Color.LTGRAY);
+            p.setTextAlign(Paint.Align.CENTER);
+            p.setTypeface(Typeface.DEFAULT_BOLD);
+            p.setTextSize(r * .40f);
+            c.drawText("OFF", x, y + r * .14f, p);
         }
 
-        private void drawSpecial(Canvas c,float x,float y,float r,String s) {
-            p.setColor(s.contains("Court")?Color.rgb(255,145,30):s.contains("Sick")?red:Color.rgb(122,81,255));
-            c.drawCircle(x,y,r,p);
-            p.setColor(Color.WHITE); p.setTextAlign(Paint.Align.CENTER); p.setTypeface(Typeface.DEFAULT_BOLD); p.setTextSize(r*.72f);
-            String symbol=s.contains("Court")?"⚖":s.contains("Sick")?"+":s.contains("Extra")?"★":"C";
-            c.drawText(symbol,x,y+r*.25f,p);
+        private void drawSpecial(Canvas c, float x, float y, float r, String s) {
+            int color = s.contains("Court") ? Color.rgb(255, 145, 30) :
+                    s.contains("Sick") ? red :
+                    s.contains("Extra") ? Color.rgb(32, 150, 136) :
+                    Color.rgb(122, 81, 255);
+            p.setColor(color);
+            c.drawCircle(x, y, r, p);
+
+            p.setColor(Color.WHITE);
+            p.setTextAlign(Paint.Align.CENTER);
+            p.setTypeface(Typeface.DEFAULT_BOLD);
+            p.setTextSize(r * .68f);
+            String symbol = s.contains("Court") ? "⚖" :
+                    s.contains("Sick") ? "+" :
+                    s.contains("Extra") ? "★" : "C";
+            c.drawText(symbol, x, y + r * .24f, p);
         }
 
         private int labelColor(String s) {
-            if(s.equals("Day Shift")) return gold;
-            if(s.equals("Night Shift")) return Color.rgb(55,155,255);
-            if(s.equals("Vacation")) return Color.rgb(207,102,255);
-            if(s.equals("Day Off")) return Color.LTGRAY;
+            if (s.equals("Day Shift")) return gold;
+            if (s.equals("Night Shift")) return Color.rgb(65, 160, 255);
+            if (s.equals("Vacation")) return Color.rgb(210, 106, 255);
+            if (s.equals("Day Off")) return Color.LTGRAY;
             return Color.WHITE;
         }
 
@@ -795,7 +1081,7 @@ public class MainActivity extends Activity {
             if (s.contains("OT Requested")) return "OT";
             if (s.contains("Comp Requested")) return "COMP+";
             if (s.contains("Regular")) return "EXTRA";
-            if (s.equals("Vacation")) return "VACATION";
+            if (s.equals("Vacation")) return "VAC";
             if (s.equals("Sick")) return "SICK";
             if (s.equals("Comp Taken")) return "COMP";
             if (s.equals("Court")) return "COURT";

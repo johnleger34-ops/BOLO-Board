@@ -1,16 +1,19 @@
-# BOLO Board Native Android — Police UI Update
+# BOLO Board Native Android — UI and Payroll Rebuild
 
-Version 1.1 includes:
+Version 1.2.0 changes:
 
-- Bottom navigation padded above Android's Back/Home navigation area
-- BOLO BOARD title only
-- Dark police-themed interface
-- Police car and red/blue emergency-light header
-- Police-officer sun icon for day shifts
-- Police-officer moon icon for night shifts
-- Empty police car with ON VACATION note for vacation days
-- Badge-style off-duty icon
-- Redesigned payroll, leave, and settings screens
-- Existing offline scheduling and payroll logic retained
+- Rebuilt police-cruiser header with windshield, hood, grille, headlights, and light bar
+- Cleaner day-shift police sun
+- Cleaner night-shift police moon
+- More compact calendar cells so the month fits better
+- Pay configuration fields shown directly on the Payroll screen:
+  - Hourly rate
+  - Overtime hourly rate
+  - Court pay per subpoena
+  - Supplemental pay per eligible check
+- Save-and-recalculate button
+- Regular pay, overtime pay, court pay, supplemental pay, and gross estimate displayed separately
+- Bottom navigation remains above Android system controls
+- Existing schedule, leave, comp, court, and local-storage functions retained
 
-Build through the included GitHub Actions workflow.
+Build using the included GitHub Actions workflow.
