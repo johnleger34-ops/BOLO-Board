@@ -886,17 +886,14 @@ public class MainActivity extends Activity {
     }
 
     private void showSavedStubDialog(JSONObject o) {
-        String text="Pay date: "+displayDate.format(new Date(o.optLong("payday")))+"
-"+
-                "Pay period: "+displayDate.format(new Date(o.optLong("start")))+" – "+displayDate.format(new Date(o.optLong("end")))+"
-
-"+
-                "Gross: "+money(o.optDouble("gross"))+"
-Federal: "+money(o.optDouble("federal"))+"
-Louisiana: "+money(o.optDouble("state"))+"
-Retirement: "+money(o.optDouble("retirement"))+"
-Health: "+money(o.optDouble("health"))+"
-Net: "+money(o.optDouble("net"));
+        String text="Pay date: "+displayDate.format(new Date(o.optLong("payday")))+"\n"+
+                "Pay period: "+displayDate.format(new Date(o.optLong("start")))+" – "+displayDate.format(new Date(o.optLong("end")))+"\n\n"+
+                "Gross: "+money(o.optDouble("gross"))+"\n"+
+                "Federal: "+money(o.optDouble("federal"))+"\n"+
+                "Louisiana: "+money(o.optDouble("state"))+"\n"+
+                "Retirement: "+money(o.optDouble("retirement"))+"\n"+
+                "Health: "+money(o.optDouble("health"))+"\n"+
+                "Net: "+money(o.optDouble("net"));
         new AlertDialog.Builder(this).setTitle(o.optString("name",activeProfile)+" Pay Stub").setMessage(text).setPositiveButton("Close",null).show();
     }
 
