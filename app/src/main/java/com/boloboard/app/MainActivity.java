@@ -18,6 +18,8 @@ import android.widget.*;
 
 import java.text.SimpleDateFormat;
 import java.util.*;
+import org.json.JSONObject;
+import org.json.JSONArray;
 
 public class MainActivity extends Activity {
 
@@ -652,8 +654,10 @@ public class MainActivity extends Activity {
         double taxableGross = Math.max(0, gross - health);
         double retirementBase = regularPay + supplementalPay;
         double retirement = retirementBase * (getDouble("retirement_percent", 0) / 100.0);
-        double federalTax = estimateFederalWithholding(taxableGross, getString("federal_status", FEDERAL_STATUSES[0])) + getDouble("federal_extra", 0);
-        double stateTax = estimateLouisianaWithholding(taxableGross, getString("state_status", LOUISIANA_STATUSES[0])) + getDouble("state_extra", 0);
+        double federalTax = estimateFederalWithholding(taxableGross, getString("federal_status", FEDERAL_STATUSES[0]),
+                (int)getDouble("federal_children", 0), (int)getDouble("federal_other_dependents", 0)) + getDouble("federal_extra", 0);
+        double stateTax = estimateLouisianaWithholding(taxableGross, getString("state_status", LOUISIANA_STATUSES[0]),
+                (int)getDouble("state_dependents", 0)) + getDouble("state_extra", 0);
         double other = getDouble("other_deductions", 0);
         double net = gross - health - retirement - federalTax - stateTax - other;
 
@@ -690,7 +694,15 @@ public class MainActivity extends Activity {
         final Calendar startFinal = (Calendar) start.clone();
         final Calendar endFinal = (Calendar) end.clone();
 
-        content.addView(action("SHARE PAYCHECK IMAGE", v -> sharePayStubImage(startFinal, endFinal, actualWorkedFinal, paidLeaveFinal, overtimeHoursFinal, regularPayFinal, overtimePayFinal, courtPayFinal, supplementalPayFinal, grossFinal)));
+        content.addView(action("SAVE CURRENT PAY STUB", v -> {
+            savePayStubSnapshot(startFinal, endFinal, actualWorkedFinal, paidLeaveFinal, overtimeHoursFinal,
+                    regularPayFinal, overtimePayFinal, courtPayFinal, supplementalPayFinal, grossFinal);
+            Toast.makeText(this, "Pay stub saved", Toast.LENGTH_SHORT).show();
+            showPayrollScreen();
+        }));
+        content.addView(action("SHARE CURRENT PAYCHECK IMAGE", v -> sharePayStubImage(startFinal, endFinal, actualWorkedFinal, paidLeaveFinal, overtimeHoursFinal, regularPayFinal, overtimePayFinal, courtPayFinal, supplementalPayFinal, grossFinal)));
+
+        addPreviousPayStubsSection();
     }
 
     private Calendar currentPayPeriodStart() {
@@ -790,7 +802,7 @@ public class MainActivity extends Activity {
         return count;
     }
 
-    private double estimateFederalWithholding(double biweeklyTaxable, String status) {
+    private double estimateFederalWithholding(double biweeklyTaxable, String status, int qualifyingChildren, int otherDependents) {
         double annual = biweeklyTaxable * 26.0;
         double deduction = status.equals(FEDERAL_STATUSES[1]) ? 32200 : status.equals(FEDERAL_STATUSES[2]) ? 24150 : 16100;
         double taxable = Math.max(0, annual - deduction);
@@ -798,7 +810,8 @@ public class MainActivity extends Activity {
         if (status.equals(FEDERAL_STATUSES[1])) tax = bracketTax(taxable, new double[]{24800,100800,211400,403550,512450,768700}, new double[]{.10,.12,.22,.24,.32,.35,.37});
         else if (status.equals(FEDERAL_STATUSES[2])) tax = bracketTax(taxable, new double[]{17700,67450,107000,203350,258350,640600}, new double[]{.10,.12,.22,.24,.32,.35,.37});
         else tax = bracketTax(taxable, new double[]{12400,50400,105700,201775,256225,640600}, new double[]{.10,.12,.22,.24,.32,.35,.37});
-        return Math.max(0, tax / 26.0);
+        double annualDependentCredit = Math.max(0, qualifyingChildren) * 2200.0 + Math.max(0, otherDependents) * 500.0;
+        return Math.max(0, (tax - annualDependentCredit) / 26.0);
     }
 
     private double bracketTax(double income, double[] limits, double[] rates) {
@@ -807,9 +820,89 @@ public class MainActivity extends Activity {
         return tax + Math.max(0,income-prev)*rates[rates.length-1];
     }
 
-    private double estimateLouisianaWithholding(double biweeklyTaxable, String status) {
+    private double estimateLouisianaWithholding(double biweeklyTaxable, String status, int dependents) {
         double annualExemption = status.equals(LOUISIANA_STATUSES[1]) ? 25000 : 12500;
-        return Math.max(0, ((biweeklyTaxable*26.0 - annualExemption) * .03) / 26.0);
+        annualExemption += Math.max(0, dependents) * 1000.0;
+        return Math.max(0, ((biweeklyTaxable*26.0 - annualExemption) * .0309) / 26.0);
+    }
+
+    private void savePayStubSnapshot(Calendar start, Calendar end, double worked, double leave, double otHours,
+                                     double regularPay, double otPay, double courtPay, double supplement, double gross) {
+        try {
+            Calendar payday = paydayForPeriod(start);
+            boolean healthApplies = paycheckOccurrenceInMonth(payday) <= 2;
+            double health = healthApplies ? getDouble("health_deduction",0) : 0;
+            double retirement = (regularPay + supplement) * (getDouble("retirement_percent",0)/100.0);
+            double taxableGross = Math.max(0, gross-health);
+            double federal = estimateFederalWithholding(taxableGross, getString("federal_status",FEDERAL_STATUSES[0]),
+                    (int)getDouble("federal_children",0), (int)getDouble("federal_other_dependents",0)) + getDouble("federal_extra",0);
+            double state = estimateLouisianaWithholding(taxableGross, getString("state_status",LOUISIANA_STATUSES[0]),
+                    (int)getDouble("state_dependents",0)) + getDouble("state_extra",0);
+            double other = getDouble("other_deductions",0);
+            double net = gross-health-retirement-federal-state-other;
+            JSONObject o = new JSONObject();
+            o.put("id", payday.getTimeInMillis()); o.put("payday", payday.getTimeInMillis());
+            o.put("start", start.getTimeInMillis()); o.put("end", end.getTimeInMillis());
+            o.put("name", prefs.getString("officer_name",activeProfile));
+            o.put("worked",worked); o.put("leave",leave); o.put("otHours",otHours);
+            o.put("regularPay",regularPay); o.put("otPay",otPay); o.put("courtPay",courtPay);
+            o.put("supplement",supplement); o.put("gross",gross); o.put("health",health);
+            o.put("retirement",retirement); o.put("federal",federal); o.put("state",state);
+            o.put("other",other); o.put("net",net);
+            o.put("vacation",getDouble("vacation_balance",0)); o.put("sick",getDouble("sick_balance",0)); o.put("comp",getDouble("comp_balance",0));
+            String key="stub_"+payday.getTimeInMillis();
+            prefs.edit().putString(key,o.toString()).apply();
+            ArrayList<Long> ids=getSavedStubIds();
+            if(!ids.contains(payday.getTimeInMillis())) ids.add(payday.getTimeInMillis());
+            Collections.sort(ids, Collections.reverseOrder());
+            JSONArray arr=new JSONArray(); for(Long id:ids) arr.put(id);
+            prefs.edit().putString("stub_index",arr.toString()).apply();
+        } catch(Exception ignored) {}
+    }
+
+    private ArrayList<Long> getSavedStubIds() {
+        ArrayList<Long> ids=new ArrayList<>();
+        try { JSONArray arr=new JSONArray(prefs.getString("stub_index","[]")); for(int i=0;i<arr.length();i++) ids.add(arr.getLong(i)); } catch(Exception ignored) {}
+        Collections.sort(ids, Collections.reverseOrder()); return ids;
+    }
+
+    private JSONObject getSavedStub(long id) {
+        try { return new JSONObject(prefs.getString("stub_"+id,"{}")); } catch(Exception e) { return new JSONObject(); }
+    }
+
+    private void addPreviousPayStubsSection() {
+        ArrayList<Long> ids=getSavedStubIds();
+        content.addView(section("PREVIOUS PAY STUBS"));
+        if(ids.isEmpty()) { content.addView(summaryCard("SAVED STUBS","None saved yet","▤")); return; }
+        Spinner spinner=new Spinner(this);
+        ArrayList<String> labels=new ArrayList<>();
+        for(Long id:ids) { JSONObject o=getSavedStub(id); labels.add(displayDate.format(new Date(o.optLong("payday",id)))+" • "+money(o.optDouble("net",0))); }
+        spinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, labels));
+        content.addView(labeledSpinner("NEWEST TO OLDEST",spinner));
+        LinearLayout actions=new LinearLayout(this); actions.setOrientation(LinearLayout.HORIZONTAL);
+        TextView view=action("VIEW",v->showSavedStubDialog(getSavedStub(ids.get(spinner.getSelectedItemPosition()))));
+        TextView share=action("SHARE",v->shareSavedStubImage(getSavedStub(ids.get(spinner.getSelectedItemPosition()))));
+        actions.addView(view,new LinearLayout.LayoutParams(0,dp(52),1)); actions.addView(share,new LinearLayout.LayoutParams(0,dp(52),1)); content.addView(actions);
+    }
+
+    private void showSavedStubDialog(JSONObject o) {
+        String text="Pay date: "+displayDate.format(new Date(o.optLong("payday")))+"
+"+
+                "Pay period: "+displayDate.format(new Date(o.optLong("start")))+" – "+displayDate.format(new Date(o.optLong("end")))+"
+
+"+
+                "Gross: "+money(o.optDouble("gross"))+"
+Federal: "+money(o.optDouble("federal"))+"
+Louisiana: "+money(o.optDouble("state"))+"
+Retirement: "+money(o.optDouble("retirement"))+"
+Health: "+money(o.optDouble("health"))+"
+Net: "+money(o.optDouble("net"));
+        new AlertDialog.Builder(this).setTitle(o.optString("name",activeProfile)+" Pay Stub").setMessage(text).setPositiveButton("Close",null).show();
+    }
+
+    private void shareSavedStubImage(JSONObject o) {
+        Calendar start=Calendar.getInstance(); start.setTimeInMillis(o.optLong("start")); Calendar end=Calendar.getInstance(); end.setTimeInMillis(o.optLong("end"));
+        sharePayStubSnapshotImage(o,start,end);
     }
 
     private void sharePayStubImage(Calendar start, Calendar end, double worked, double leave, double otHours, double regularPay, double otPay, double courtPay, double supplement, double gross) {
@@ -820,8 +913,10 @@ public class MainActivity extends Activity {
             double retirementBase = regularPay + supplement;
             double retirement = retirementBase * (getDouble("retirement_percent",0)/100.0);
             double taxableGross = Math.max(0, gross-health);
-            double federal = estimateFederalWithholding(taxableGross, getString("federal_status",FEDERAL_STATUSES[0])) + getDouble("federal_extra",0);
-            double state = estimateLouisianaWithholding(taxableGross, getString("state_status",LOUISIANA_STATUSES[0])) + getDouble("state_extra",0);
+            double federal = estimateFederalWithholding(taxableGross, getString("federal_status",FEDERAL_STATUSES[0]),
+                    (int)getDouble("federal_children",0), (int)getDouble("federal_other_dependents",0)) + getDouble("federal_extra",0);
+            double state = estimateLouisianaWithholding(taxableGross, getString("state_status",LOUISIANA_STATUSES[0]),
+                    (int)getDouble("state_dependents",0)) + getDouble("state_extra",0);
             double other = getDouble("other_deductions",0);
             double net = gross-health-retirement-federal-state-other;
             Bitmap bmp=Bitmap.createBitmap(1080,1350,Bitmap.Config.ARGB_8888); Canvas c=new Canvas(bmp); Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -829,9 +924,10 @@ public class MainActivity extends Activity {
             p.setColor(Color.rgb(19,38,58)); c.drawRoundRect(new RectF(45,45,1035,1305),34,34,p);
             p.setTextAlign(Paint.Align.CENTER); p.setTypeface(Typeface.DEFAULT_BOLD); p.setColor(Color.WHITE); p.setTextSize(70); c.drawText("BOLO BOARD PAY STUB",540,135,p);
             p.setTextSize(40); p.setColor(gold); c.drawText(prefs.getString("officer_name",activeProfile),540,195,p);
-            p.setTextSize(28); p.setColor(silver); c.drawText(displayDate.format(start.getTime())+" – "+displayDate.format(end.getTime()),540,240,p);
-            drawMoneyOfficer(c,p,540,380);
-            p.setTextAlign(Paint.Align.LEFT); int y=560;
+            p.setTextSize(25); p.setColor(silver); c.drawText("Pay date: "+displayDate.format(payday.getTime()),540,238,p);
+            c.drawText("Pay period: "+displayDate.format(start.getTime())+" – "+displayDate.format(end.getTime()),540,275,p);
+            drawMoneyOfficer(c,p,540,415);
+            p.setTextAlign(Paint.Align.LEFT); int y=595;
             y=stubLine(c,p,"Actual hours worked",String.format(Locale.US,"%.1f",worked),y);
             y=stubLine(c,p,"Paid leave hours",String.format(Locale.US,"%.1f",leave),y);
             y=stubLine(c,p,"Regular wages",money(regularPay),y);
@@ -857,6 +953,27 @@ public class MainActivity extends Activity {
         p.setColor(Color.rgb(20,40,65)); c.drawRect(x-110,y-130,x+110,y-95,p); c.drawRect(x-70,y-170,x+70,y-125,p);
         p.setColor(Color.WHITE); p.setTextSize(34); c.drawText("POLICE",x,y-105,p);
         p.setColor(Color.rgb(80,190,105)); for(int i=-3;i<=3;i++){ float dx=i*115; c.save(); c.rotate(i*12,x+dx,y-5-Math.abs(i)*22); c.drawRect(x+dx-30,y-20-Math.abs(i)*25,x+dx+30,y+15-Math.abs(i)*25,p); c.restore(); }
+    }
+
+    private void sharePayStubSnapshotImage(JSONObject o, Calendar start, Calendar end) {
+        try {
+            Bitmap bmp=Bitmap.createBitmap(1080,1350,Bitmap.Config.ARGB_8888); Canvas c=new Canvas(bmp); Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+            p.setColor(Color.rgb(5,14,25)); c.drawRect(0,0,1080,1350,p); p.setColor(Color.rgb(19,38,58)); c.drawRoundRect(new RectF(45,45,1035,1305),34,34,p);
+            p.setTextAlign(Paint.Align.CENTER); p.setTypeface(Typeface.DEFAULT_BOLD); p.setColor(Color.WHITE); p.setTextSize(70); c.drawText("BOLO BOARD PAY STUB",540,135,p);
+            p.setTextSize(40); p.setColor(gold); c.drawText(o.optString("name",activeProfile),540,195,p);
+            p.setTextSize(25); p.setColor(silver); c.drawText("Pay date: "+displayDate.format(new Date(o.optLong("payday"))),540,238,p);
+            c.drawText("Pay period: "+displayDate.format(start.getTime())+" – "+displayDate.format(end.getTime()),540,275,p);
+            drawMoneyOfficer(c,p,540,415); p.setTextAlign(Paint.Align.LEFT); int y=595;
+            y=stubLine(c,p,"Actual hours worked",String.format(Locale.US,"%.1f",o.optDouble("worked")),y);
+            y=stubLine(c,p,"Paid leave hours",String.format(Locale.US,"%.1f",o.optDouble("leave")),y);
+            y=stubLine(c,p,"Regular wages",money(o.optDouble("regularPay")),y); y=stubLine(c,p,"Overtime ("+String.format(Locale.US,"%.1f",o.optDouble("otHours"))+" hrs)",money(o.optDouble("otPay")),y);
+            y=stubLine(c,p,"Court pay",money(o.optDouble("courtPay")),y); y=stubLine(c,p,"Supplemental pay",money(o.optDouble("supplement")),y); y=stubLine(c,p,"Gross pay",money(o.optDouble("gross")),y);
+            y=stubLine(c,p,"Health insurance",money(o.optDouble("health")),y); y=stubLine(c,p,"Retirement",money(o.optDouble("retirement")),y); y=stubLine(c,p,"Federal withholding",money(o.optDouble("federal")),y); y=stubLine(c,p,"Louisiana withholding",money(o.optDouble("state")),y); y=stubLine(c,p,"Other deductions",money(o.optDouble("other")),y);
+            p.setColor(gold); p.setTextSize(46); p.setTypeface(Typeface.DEFAULT_BOLD); c.drawText("NET",85,y+40,p); p.setTextAlign(Paint.Align.RIGHT); c.drawText(money(o.optDouble("net")),995,y+40,p);
+            p.setTextAlign(Paint.Align.LEFT); p.setTextSize(28); p.setColor(silver); c.drawText("BANKS  •  Vacation "+formatHours(o.optDouble("vacation"))+"   Sick "+formatHours(o.optDouble("sick"))+"   Comp "+formatHours(o.optDouble("comp")),85,y+105,p);
+            File dir=new File(getCacheDir(),"shared"); dir.mkdirs(); File f=new File(dir,"bolo-paystub-"+o.optLong("payday")+".png"); FileOutputStream out=new FileOutputStream(f); bmp.compress(Bitmap.CompressFormat.PNG,100,out); out.close();
+            Uri uri=FileProvider.getUriForFile(this,getPackageName()+".fileprovider",f); Intent send=new Intent(Intent.ACTION_SEND); send.setType("image/png"); send.putExtra(Intent.EXTRA_STREAM,uri); send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); startActivity(Intent.createChooser(send,"Share saved pay stub"));
+        } catch(Exception e){ Toast.makeText(this,"Unable to create saved pay stub image",Toast.LENGTH_LONG).show(); }
     }
 
     private String formatRate(double value) {
@@ -972,6 +1089,9 @@ public class MainActivity extends Activity {
         stateStatus.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, LOUISIANA_STATUSES));
         selectSpinner(stateStatus, LOUISIANA_STATUSES, getString("state_status", LOUISIANA_STATUSES[0]));
 
+        EditText federalChildren = input("Number of qualifying children under 17", formatRate(getDouble("federal_children", 0)), true);
+        EditText federalOtherDependents = input("Number of other dependents", formatRate(getDouble("federal_other_dependents", 0)), true);
+        EditText stateDependents = input("Louisiana dependents / exemptions", formatRate(getDouble("state_dependents", 0)), true);
         EditText retirement = input("Retirement percentage", formatRate(getDouble("retirement_percent", 0)), true);
         EditText federalExtra = input("Extra federal dollars per check", formatRate(getDouble("federal_extra", 0)), true);
         EditText stateExtra = input("Extra Louisiana dollars per check", formatRate(getDouble("state_extra", 0)), true);
@@ -980,6 +1100,9 @@ public class MainActivity extends Activity {
 
         content.addView(labeledSpinner("FEDERAL FILING STATUS", federalStatus));
         content.addView(labeledSpinner("LOUISIANA FILING STATUS", stateStatus));
+        content.addView(labeledField("FEDERAL QUALIFYING CHILDREN UNDER 17", federalChildren));
+        content.addView(labeledField("FEDERAL OTHER DEPENDENTS", federalOtherDependents));
+        content.addView(labeledField("LOUISIANA DEPENDENTS / EXEMPTIONS", stateDependents));
         content.addView(labeledField("RETIREMENT %", retirement));
         content.addView(labeledField("ADDITIONAL FEDERAL WITHHOLDING", federalExtra));
         content.addView(labeledField("ADDITIONAL LOUISIANA WITHHOLDING", stateExtra));
@@ -1005,6 +1128,9 @@ public class MainActivity extends Activity {
                     .putLong("anchor", selectedAnchor[0]).putLong("pay_period_anchor", payPeriodAnchor[0]).putLong("payday_anchor", paydayAnchor[0])
                     .putString("federal_status", FEDERAL_STATUSES[federalStatus.getSelectedItemPosition()])
                     .putString("state_status", LOUISIANA_STATUSES[stateStatus.getSelectedItemPosition()])
+                    .putString("federal_children", federalChildren.getText().toString())
+                    .putString("federal_other_dependents", federalOtherDependents.getText().toString())
+                    .putString("state_dependents", stateDependents.getText().toString())
                     .putString("retirement_percent", retirement.getText().toString())
                     .putString("federal_extra", federalExtra.getText().toString()).putString("state_extra", stateExtra.getText().toString())
                     .putString("health_deduction", health.getText().toString()).putString("other_deductions", deductions.getText().toString())
@@ -1119,15 +1245,12 @@ public class MainActivity extends Activity {
         }
 
         private void drawCruiser(Canvas c, int w, int h) {
-            Bitmap car = BitmapFactory.decodeResource(getResources(), R.drawable.police_charger);
+            Bitmap car = BitmapFactory.decodeResource(getResources(), R.drawable.police_charger_cutout);
             if (car == null) return;
             Rect src = new Rect(0, 0, car.getWidth(), car.getHeight());
             RectF dst = new RectF(dp(22), dp(58), w-dp(22), h-dp(4));
             p.setAlpha(255);
             c.drawBitmap(car, src, dst, p);
-            p.setAlpha(255);
-            p.setColor(Color.argb(80,0,0,0));
-            c.drawRoundRect(dst, dp(10), dp(10), p);
         }
     }
 
