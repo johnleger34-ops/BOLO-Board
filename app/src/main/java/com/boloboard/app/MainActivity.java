@@ -9,6 +9,9 @@ import android.net.Uri;
 import androidx.core.content.FileProvider;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import android.graphics.*;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.BitmapDrawable;
@@ -27,6 +30,7 @@ import org.json.JSONArray;
 public class MainActivity extends Activity {
 
     private static final String PREFS = "bolo_board";
+    private static final int REQUEST_IMPORT_BACKUP = 4107;
     private static final String[] PATTERNS = {"Alpha", "Bravo", "Charlie", "Delta"};
     private static final String[] FEDERAL_STATUSES = {"Single or Married Filing Separately", "Married Filing Jointly", "Head of Household"};
     private static final String[] LOUISIANA_STATUSES = {"Single / Married Filing Separately", "Married Filing Jointly", "Head of Household"};
@@ -90,6 +94,8 @@ public class MainActivity extends Activity {
                     .putString("retirement_percent", "10")
                     .putString("social_security_percent", "6.2")
                     .putString("health_deduction", "86.77")
+                    .putString("cafeteria_plan_deduction", "67.20")
+                    .putString("insurance_deduction", "19.57")
                     .putString("supplement", "300")
                     .putBoolean("john_stub_defaults_v1", true)
                     .apply();
@@ -759,8 +765,11 @@ public class MainActivity extends Activity {
 
         Calendar paydayForPeriod = paydayForPeriod(start);
         boolean healthApplies = paycheckOccurrenceInMonth(paydayForPeriod) <= 2;
-        double health = healthApplies ? getDouble("health_deduction", 0) : 0;
-        double taxableGross = Math.max(0, gross - health);
+        double cafeteriaPlan = activeProfile.equals("John") && healthApplies ? getDouble("cafeteria_plan_deduction", 67.20) : 0;
+        double insurance = activeProfile.equals("John") && healthApplies ? getDouble("insurance_deduction", 19.57) : 0;
+        double health = activeProfile.equals("John") ? moneyValue(bd(cafeteriaPlan).add(bd(insurance)))
+                : (healthApplies ? getDouble("health_deduction", 0) : 0);
+        double ficaTaxableGross = activeProfile.equals("John") ? Math.max(0, gross - cafeteriaPlan) : gross;
         // John contributes retirement on every earning code, including OT and court pay.
         // Alexis keeps the original retirement base used by her employer.
         double retirementBase = activeProfile.equals("John") ? gross : regularPay + holidayPay + supplementalPay;
@@ -769,8 +778,8 @@ public class MainActivity extends Activity {
                 (int)getDouble("federal_children", 0), (int)getDouble("federal_other_dependents", 0))).add(bd(getDouble("federal_extra", 0))));
         double stateTax = moneyValue(bd(estimateLouisianaWithholding(gross, getString("state_status", LOUISIANA_STATUSES[0]),
                 (int)getDouble("state_dependents", 0))).add(bd(getDouble("state_extra", 0))));
-        double socialSecurity = moneyValue(bd(gross).multiply(bd(getDouble("social_security_percent", activeProfile.equals("John") ? 6.2 : 0))).divide(new BigDecimal("100"), 12, RoundingMode.HALF_UP));
-        double medicare = moneyValue(bd(gross).multiply(new BigDecimal("0.0145")));
+        double socialSecurity = moneyValue(bd(ficaTaxableGross).multiply(bd(getDouble("social_security_percent", activeProfile.equals("John") ? 6.2 : 0))).divide(new BigDecimal("100"), 12, RoundingMode.HALF_UP));
+        double medicare = moneyValue(bd(ficaTaxableGross).multiply(new BigDecimal("0.0145")));
         double other = moneyValue(bd(getDouble("other_deductions", 0)));
         double net = moneyValue(bd(gross).subtract(bd(health)).subtract(bd(retirement)).subtract(bd(federalTax))
                 .subtract(bd(stateTax)).subtract(bd(socialSecurity)).subtract(bd(medicare)).subtract(bd(other)));
@@ -784,7 +793,8 @@ public class MainActivity extends Activity {
         content.addView(summaryCard("COURT", courtHours + " hrs  •  " + money(courtPay), "⚖"));
         content.addView(summaryCard("SUPPLEMENTAL PAY", money(supplementalPay), "✦"));
         content.addView(summaryCard("ESTIMATED GROSS CHECK", money(gross), "$"));
-        content.addView(summaryCard("PRETAX INSURANCE & BENEFITS", healthApplies ? money(health) : "$0.00 • third check", "✚"));
+        content.addView(summaryCard("CAFETERIA PLAN", activeProfile.equals("John") ? money(cafeteriaPlan) : (healthApplies ? money(health) : "$0.00 • third check"), "✚"));
+        if (activeProfile.equals("John")) content.addView(summaryCard("INSURANCE", money(insurance), "✚"));
         content.addView(summaryCard("RETIREMENT", money(retirement), "★"));
         content.addView(summaryCard("FEDERAL WITHHOLDING", money(federalTax), "F"));
         content.addView(summaryCard("LOUISIANA WITHHOLDING", money(stateTax), "LA"));
@@ -995,7 +1005,11 @@ public class MainActivity extends Activity {
         try {
             Calendar payday = paydayForPeriod(start);
             boolean healthApplies = paycheckOccurrenceInMonth(payday) <= 2;
-            double health = healthApplies ? moneyValue(bd(getDouble("health_deduction", 0))) : 0;
+            double cafeteriaPlan = activeProfile.equals("John") && healthApplies ? getDouble("cafeteria_plan_deduction", 67.20) : 0;
+            double insurance = activeProfile.equals("John") && healthApplies ? getDouble("insurance_deduction", 19.57) : 0;
+            double health = activeProfile.equals("John") ? moneyValue(bd(cafeteriaPlan).add(bd(insurance)))
+                    : (healthApplies ? moneyValue(bd(getDouble("health_deduction", 0))) : 0);
+            double ficaTaxableGross = activeProfile.equals("John") ? Math.max(0, gross - cafeteriaPlan) : gross;
             double retirementBase = activeProfile.equals("John") ? gross : regularPay + holidayPay + supplement;
             double retirement = moneyValue(bd(retirementBase)
                     .multiply(bd(getDouble("retirement_percent", activeProfile.equals("John") ? 10 : 0)))
@@ -1009,8 +1023,8 @@ public class MainActivity extends Activity {
                     getString("state_status", LOUISIANA_STATUSES[0]),
                     (int)getDouble("state_dependents", 0)))
                     .add(bd(getDouble("state_extra", 0))));
-            double socialSecurity = moneyValue(bd(gross).multiply(bd(getDouble("social_security_percent", activeProfile.equals("John") ? 6.2 : 0))).divide(new BigDecimal("100"), 12, RoundingMode.HALF_UP));
-            double medicare = moneyValue(bd(gross).multiply(new BigDecimal("0.0145")));
+            double socialSecurity = moneyValue(bd(ficaTaxableGross).multiply(bd(getDouble("social_security_percent", activeProfile.equals("John") ? 6.2 : 0))).divide(new BigDecimal("100"), 12, RoundingMode.HALF_UP));
+            double medicare = moneyValue(bd(ficaTaxableGross).multiply(new BigDecimal("0.0145")));
             double other = moneyValue(bd(getDouble("other_deductions", 0)));
             double net = moneyValue(bd(gross).subtract(bd(health)).subtract(bd(retirement))
                     .subtract(bd(federal)).subtract(bd(state)).subtract(bd(socialSecurity)).subtract(bd(medicare)).subtract(bd(other)));
@@ -1023,7 +1037,7 @@ public class MainActivity extends Activity {
             o.put("worked", worked); o.put("leave", leave); o.put("otHours", otHours);
             o.put("regularPay", regularPay); o.put("holidayPay", holidayPay); o.put("otPay", otPay);
             o.put("courtPay", courtPay); o.put("supplement", supplement); o.put("gross", gross);
-            o.put("health", health); o.put("retirement", retirement); o.put("federal", federal);
+            o.put("health", health); o.put("cafeteriaPlan", cafeteriaPlan); o.put("insurance", insurance); o.put("retirement", retirement); o.put("federal", federal);
             o.put("state", state); o.put("socialSecurity", socialSecurity); o.put("medicare", medicare); o.put("other", other); o.put("net", net);
             o.put("vacation", getDouble("vacation_balance", 0));
             o.put("sick", getDouble("sick_balance", 0));
@@ -1282,6 +1296,8 @@ public class MainActivity extends Activity {
         EditText federalExtra = input("Extra federal dollars per check", formatRate(getDouble("federal_extra", 0)), true);
         EditText stateExtra = input("Extra Louisiana dollars per check", formatRate(getDouble("state_extra", 0)), true);
         EditText health = input("Pretax insurance & benefits per check", formatRate(getDouble("health_deduction", 0)), true);
+        EditText cafeteriaPlan = input("Cafeteria plan per check", formatRate(getDouble("cafeteria_plan_deduction", 67.20)), true);
+        EditText insurance = input("Insurance per check", formatRate(getDouble("insurance_deduction", 19.57)), true);
         EditText deductions = input("Other deductions per check", formatRate(getDouble("other_deductions", 0)), true);
 
         content.addView(labeledSpinner("FEDERAL FILING STATUS", federalStatus));
@@ -1293,7 +1309,12 @@ public class MainActivity extends Activity {
         content.addView(labeledField("SOCIAL SECURITY %", socialSecurity));
         content.addView(labeledField("ADDITIONAL FEDERAL WITHHOLDING", federalExtra));
         content.addView(labeledField("ADDITIONAL LOUISIANA WITHHOLDING", stateExtra));
-        content.addView(labeledField("PRETAX INSURANCE & BENEFITS — FIRST TWO CHECKS EACH MONTH", health));
+        if (activeProfile.equals("John")) {
+            content.addView(labeledField("CAFETERIA PLAN — FIRST TWO CHECKS EACH MONTH", cafeteriaPlan));
+            content.addView(labeledField("INSURANCE — FIRST TWO CHECKS EACH MONTH", insurance));
+        } else {
+            content.addView(labeledField("PRETAX INSURANCE & BENEFITS — FIRST TWO CHECKS EACH MONTH", health));
+        }
         content.addView(labeledField("OTHER DEDUCTIONS PER CHECK", deductions));
 
         content.addView(section("LEAVE BANKS"));
@@ -1322,13 +1343,24 @@ public class MainActivity extends Activity {
                     .putString("retirement_percent", retirement.getText().toString())
                     .putString("social_security_percent", socialSecurity.getText().toString())
                     .putString("federal_extra", federalExtra.getText().toString()).putString("state_extra", stateExtra.getText().toString())
-                    .putString("health_deduction", health.getText().toString()).putString("other_deductions", deductions.getText().toString())
+                    .putString("health_deduction", health.getText().toString())
+                    .putString("cafeteria_plan_deduction", cafeteriaPlan.getText().toString())
+                    .putString("insurance_deduction", insurance.getText().toString())
+                    .putString("other_deductions", deductions.getText().toString())
                     .putString("vacation_balance", vacation.getText().toString()).putString("sick_balance", sick.getText().toString())
                     .putString("comp_balance", comp.getText().toString()).putString("vacation_accrual", vacAcc.getText().toString())
                     .putString("sick_accrual", sickAcc.getText().toString()).apply();
             Toast.makeText(this, "Settings saved", Toast.LENGTH_SHORT).show();
             showCalendarScreen();
         }));
+
+        content.addView(section("BACKUP & FUTURE UPDATES"));
+        TextView backupNote = new TextView(this);
+        backupNote.setText("Export a full BOLO Board backup before installing a future build. Import restores both profiles, schedules, payroll settings, leave banks, and saved pay stubs.");
+        backupNote.setTextColor(muted); backupNote.setTextSize(13); backupNote.setPadding(dp(4), dp(4), dp(4), dp(10));
+        content.addView(backupNote);
+        content.addView(action("EXPORT FULL BACKUP", v -> exportFullBackup()));
+        content.addView(action("IMPORT FULL BACKUP", v -> chooseBackupFile()));
 
         content.addView(action("CLEAR ALL MANUAL CALENDAR ENTRIES", v -> new AlertDialog.Builder(this)
                 .setTitle("Clear overrides?").setMessage("Schedule settings and leave balances remain.")
@@ -1337,6 +1369,100 @@ public class MainActivity extends Activity {
                     for (String key : prefs.getAll().keySet()) if (key.startsWith("entry_") || key.startsWith("ot_hours_") || key.startsWith("comp_hours_") || key.startsWith("court_hours_")) ed.remove(key);
                     ed.apply(); Toast.makeText(this, "Calendar entries cleared", Toast.LENGTH_SHORT).show();
                 }).setNegativeButton("Cancel", null).show()));
+    }
+
+    private JSONObject preferencesToJson(SharedPreferences source) throws Exception {
+        JSONObject result = new JSONObject();
+        for (Map.Entry<String, ?> entry : source.getAll().entrySet()) {
+            Object value = entry.getValue();
+            if (value instanceof String || value instanceof Boolean || value instanceof Integer || value instanceof Long || value instanceof Double || value instanceof Float) {
+                result.put(entry.getKey(), value);
+            } else if (value instanceof Set) {
+                JSONArray array = new JSONArray();
+                for (Object item : (Set<?>) value) array.put(String.valueOf(item));
+                result.put(entry.getKey(), array);
+            }
+        }
+        return result;
+    }
+
+    private void restorePreferences(SharedPreferences target, JSONObject data) throws Exception {
+        SharedPreferences.Editor editor = target.edit().clear();
+        Iterator<String> keys = data.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            Object value = data.get(key);
+            if (value instanceof Boolean) editor.putBoolean(key, (Boolean) value);
+            else if (value instanceof Integer) editor.putInt(key, (Integer) value);
+            else if (value instanceof Long) editor.putLong(key, (Long) value);
+            else if (value instanceof Double) editor.putString(key, String.valueOf(value));
+            else if (value instanceof JSONArray) {
+                Set<String> set = new HashSet<>();
+                JSONArray array = (JSONArray) value;
+                for (int i = 0; i < array.length(); i++) set.add(array.getString(i));
+                editor.putStringSet(key, set);
+            } else editor.putString(key, String.valueOf(value));
+        }
+        editor.apply();
+    }
+
+    private void exportFullBackup() {
+        try {
+            JSONObject root = new JSONObject();
+            root.put("format", "BOLO_BOARD_BACKUP");
+            root.put("version", 2);
+            root.put("createdAt", System.currentTimeMillis());
+            root.put("global", preferencesToJson(getSharedPreferences(PREFS + "_global", MODE_PRIVATE)));
+            root.put("john", preferencesToJson(getSharedPreferences(PREFS + "_john", MODE_PRIVATE)));
+            root.put("alexis", preferencesToJson(getSharedPreferences(PREFS + "_alexis", MODE_PRIVATE)));
+
+            File file = new File(getCacheDir(), "BOLO-Board-Backup-" + new SimpleDateFormat("yyyy-MM-dd-HHmm", Locale.US).format(new Date()) + ".json");
+            try (FileOutputStream out = new FileOutputStream(file)) {
+                out.write(root.toString(2).getBytes(StandardCharsets.UTF_8));
+            }
+            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
+            Intent share = new Intent(Intent.ACTION_SEND);
+            share.setType("application/json");
+            share.putExtra(Intent.EXTRA_STREAM, uri);
+            share.putExtra(Intent.EXTRA_SUBJECT, "BOLO Board full backup");
+            share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(share, "Save or share BOLO Board backup"));
+        } catch (Exception e) {
+            Toast.makeText(this, "Backup export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void chooseBackupFile() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/json");
+        startActivityForResult(intent, REQUEST_IMPORT_BACKUP);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_IMPORT_BACKUP || resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        Uri uri = data.getData();
+        try (InputStream in = getContentResolver().openInputStream(uri)) {
+            if (in == null) throw new Exception("Unable to open selected file");
+            byte[] bytes = new byte[8192];
+            int read;
+            java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+            while ((read = in.read(bytes)) != -1) buffer.write(bytes, 0, read);
+            JSONObject root = new JSONObject(buffer.toString("UTF-8"));
+            if (!"BOLO_BOARD_BACKUP".equals(root.optString("format"))) throw new Exception("This is not a BOLO Board backup");
+            restorePreferences(getSharedPreferences(PREFS + "_global", MODE_PRIVATE), root.getJSONObject("global"));
+            restorePreferences(getSharedPreferences(PREFS + "_john", MODE_PRIVATE), root.getJSONObject("john"));
+            restorePreferences(getSharedPreferences(PREFS + "_alexis", MODE_PRIVATE), root.getJSONObject("alexis"));
+            globalPrefs = getSharedPreferences(PREFS + "_global", MODE_PRIVATE);
+            activeProfile = globalPrefs.getString("active_profile", "John");
+            loadProfilePrefs();
+            Toast.makeText(this, "Full backup restored", Toast.LENGTH_LONG).show();
+            showCalendarScreen();
+        } catch (Exception e) {
+            Toast.makeText(this, "Backup import failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     private LinearLayout labeledSpinner(String label, Spinner spinner) {
