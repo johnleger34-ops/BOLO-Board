@@ -1111,8 +1111,8 @@ public class MainActivity extends Activity {
         p.setColor(Color.rgb(80,190,105)); for(int i=-3;i<=3;i++){ float dx=i*115; c.save(); c.rotate(i*12,x+dx,y-5-Math.abs(i)*22); c.drawRect(x+dx-30,y-20-Math.abs(i)*25,x+dx+30,y+15-Math.abs(i)*25,p); c.restore(); }
     }
 
-     }
-    }
+     
+    
 
     private String formatRate(double value) {
         if (value == 0) return "";
