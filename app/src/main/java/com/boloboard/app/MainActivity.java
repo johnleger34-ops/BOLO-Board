@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import android.graphics.*;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.BitmapDrawable;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.*;
@@ -172,56 +173,60 @@ public class MainActivity extends Activity {
     private void baseScreen(String title) {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(navy);
+
+        Bitmap backgroundBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.police_explorer_banner);
+        BitmapDrawable background = new BitmapDrawable(getResources(), backgroundBitmap);
+        background.setGravity(Gravity.CENTER);
+        background.setAlpha(42);
+        root.setBackground(background);
 
         PoliceHeaderView header = new PoliceHeaderView(this);
-        root.addView(header, new LinearLayout.LayoutParams(-1, dp(118)));
+        root.addView(header, new LinearLayout.LayoutParams(-1, dp(58)));
+        root.addView(profileSwitcher(), new LinearLayout.LayoutParams(-1, dp(50)));
 
         if (title != null && !title.isEmpty() && !title.equals("CALENDAR")) {
             TextView sectionTitle = new TextView(this);
             sectionTitle.setText(title);
             sectionTitle.setTextColor(Color.WHITE);
-            sectionTitle.setTextSize(18);
+            sectionTitle.setTextSize(22);
             sectionTitle.setTypeface(Typeface.DEFAULT_BOLD);
             sectionTitle.setGravity(Gravity.CENTER);
-            sectionTitle.setPadding(dp(8), dp(7), dp(8), dp(7));
+            sectionTitle.setPadding(dp(12), dp(12), dp(12), dp(12));
             sectionTitle.setBackgroundColor(panel);
             root.addView(sectionTitle);
         }
 
-        LinearLayout body = new LinearLayout(this);
-        body.setOrientation(LinearLayout.HORIZONTAL);
-        body.setBackgroundColor(navy);
-
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(7), dp(6), dp(6), dp(8));
-        content.setBackgroundColor(navy);
+        content.setPadding(dp(6), dp(4), dp(6), dp(6));
+        content.setBackgroundColor(Color.argb(205, 3, 12, 23));
 
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(true);
-        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        scroll.addView(content);
-        body.addView(scroll, new LinearLayout.LayoutParams(0, -1, 1));
+        if (title != null && title.equals("CALENDAR")) {
+            root.addView(content, new LinearLayout.LayoutParams(-1, 0, 1));
+        } else {
+            ScrollView scroll = new ScrollView(this);
+            scroll.setFillViewport(true);
+            scroll.addView(content);
+            root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        }
 
         bottomNav = new LinearLayout(this);
-        bottomNav.setOrientation(LinearLayout.VERTICAL);
+        bottomNav.setOrientation(LinearLayout.HORIZONTAL);
         bottomNav.setGravity(Gravity.CENTER);
-        bottomNav.setPadding(dp(4), dp(5), dp(4), dp(5));
         bottomNav.setBackground(rounded(Color.rgb(7, 18, 31), 0, Color.rgb(45, 62, 80), 1));
 
-        addNavButton("▣\nCAL", "Calendar");
-        addNavButton("$\nPAY", "Payroll");
-        addNavButton("👤\nUSER", "Profile");
-        addNavButton("⚙\nSET", "Settings");
+        addNavButton("▣\nCALENDAR", "Calendar");
+        addNavButton("$\nPAYROLL", "Payroll");
+        addNavButton("♟\nLEAVE", "Leave");
+        addNavButton("⚙\nSETTINGS", "Settings");
 
-        body.addView(bottomNav, new LinearLayout.LayoutParams(dp(62), -1));
-        root.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
+        root.addView(bottomNav, new LinearLayout.LayoutParams(-1, -2));
 
         root.setOnApplyWindowInsetsListener((v, insets) -> {
             int bottom = insets.getSystemWindowInsetBottom();
+            int left = insets.getSystemWindowInsetLeft();
             int right = insets.getSystemWindowInsetRight();
-            bottomNav.setPadding(dp(4), dp(5), dp(4) + right, dp(5) + bottom);
+            bottomNav.setPadding(dp(6) + left, dp(7), dp(6) + right, dp(7) + bottom);
             return insets;
         });
 
@@ -234,36 +239,19 @@ public class MainActivity extends Activity {
         b.setText(label);
         b.setGravity(Gravity.CENTER);
         b.setTextColor(silver);
-        b.setTextSize(9);
+        b.setTextSize(10);
         b.setTypeface(Typeface.DEFAULT_BOLD);
-        b.setPadding(dp(2), dp(4), dp(2), dp(4));
-        b.setBackground(rounded(panel2, dp(10), Color.rgb(55, 75, 96), 1));
+        b.setPadding(dp(3), dp(3), dp(3), dp(3));
+        b.setBackground(rounded(panel2, dp(8), Color.rgb(55, 75, 96), 1));
         b.setOnClickListener(v -> {
             if (destination.equals("Calendar")) showCalendarScreen();
             else if (destination.equals("Payroll")) showPayrollScreen();
-            else if (destination.equals("Profile")) showProfileChooser();
+            else if (destination.equals("Leave")) showLeaveScreen();
             else showSettingsScreen();
         });
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, 0, 1);
-        lp.setMargins(0, dp(3), 0, dp(3));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(52), 1);
+        lp.setMargins(dp(3), 0, dp(3), 0);
         bottomNav.addView(b, lp);
-    }
-
-    private void showProfileChooser() {
-        String[] labels = {
-                "J. LEGER  •  " + getSharedPreferences(PREFS + "_john", MODE_PRIVATE).getString("rank", "Lieutenant").toUpperCase(Locale.US),
-                "A. LEGER  •  " + getSharedPreferences(PREFS + "_alexis", MODE_PRIVATE).getString("rank", "Corporal").toUpperCase(Locale.US)
-        };
-        int selected = activeProfile.equals("John") ? 0 : 1;
-        new AlertDialog.Builder(this)
-                .setTitle("ACTIVE OFFICER")
-                .setSingleChoiceItems(labels, selected, (d, which) -> {
-                    d.dismiss();
-                    switchProfile(which == 0 ? "John" : "Alexis");
-                })
-                .setNeutralButton("EDIT CURRENT RANK", (d, w) -> showRankPicker())
-                .setNegativeButton("CANCEL", null)
-                .show();
     }
 
     private TextView section(String text) {
@@ -330,7 +318,7 @@ public class MainActivity extends Activity {
         LinearLayout scheduleRow = new LinearLayout(this);
         scheduleRow.setOrientation(LinearLayout.HORIZONTAL);
         scheduleRow.setGravity(Gravity.CENTER_VERTICAL);
-        scheduleRow.setPadding(dp(7), dp(5), dp(7), dp(5));
+        scheduleRow.setPadding(dp(6), dp(4), dp(6), dp(4));
         scheduleRow.setBackground(rounded(panel, dp(10), Color.rgb(76, 94, 113), 1));
 
         LinearLayout patternBox = new LinearLayout(this);
@@ -342,7 +330,7 @@ public class MainActivity extends Activity {
         TextView pBig = new TextView(this);
         pBig.setText(prefs.getString("pattern", "Alpha").toUpperCase(Locale.US) + "  ▼");
         pBig.setTextColor(Color.WHITE);
-        pBig.setTextSize(18);
+        pBig.setTextSize(15);
         pBig.setTypeface(Typeface.DEFAULT_BOLD);
         patternBox.addView(pSmall);
         patternBox.addView(pBig);
@@ -358,32 +346,47 @@ public class MainActivity extends Activity {
         });
 
         monthTitle = new TextView(this);
-        monthTitle.setTextSize(19);
+        monthTitle.setTextSize(18);
         monthTitle.setTypeface(Typeface.DEFAULT_BOLD);
         monthTitle.setTextColor(Color.WHITE);
         monthTitle.setGravity(Gravity.CENTER);
 
-        TextView activeBadge = new TextView(this);
-        activeBadge.setText((activeProfile.equals("John") ? "JL" : "AL") + " • " + rankInsignia(prefs.getString("rank", activeProfile.equals("John") ? "Lieutenant" : "Corporal")));
-        activeBadge.setTextColor(gold);
-        activeBadge.setTextSize(10);
-        activeBadge.setTypeface(Typeface.DEFAULT_BOLD);
-        activeBadge.setGravity(Gravity.CENTER);
-        activeBadge.setOnClickListener(v -> showProfileChooser());
-        scheduleRow.addView(patternBox, new LinearLayout.LayoutParams(dp(78), -2));
-        scheduleRow.addView(activeBadge, new LinearLayout.LayoutParams(dp(48), -1));
-        scheduleRow.addView(prev, new LinearLayout.LayoutParams(dp(40), dp(42)));
+        scheduleRow.addView(patternBox, new LinearLayout.LayoutParams(dp(92), -2));
+        scheduleRow.addView(prev, new LinearLayout.LayoutParams(dp(38), dp(38)));
         scheduleRow.addView(monthTitle, new LinearLayout.LayoutParams(0, -2, 1));
-        scheduleRow.addView(next, new LinearLayout.LayoutParams(dp(40), dp(42)));
+        scheduleRow.addView(next, new LinearLayout.LayoutParams(dp(38), dp(38)));
         content.addView(scheduleRow);
 
         calendarGrid = new GridLayout(this);
         calendarGrid.setColumnCount(7);
         calendarGrid.setBackgroundColor(Color.rgb(39, 55, 70));
         LinearLayout.LayoutParams gridLp = new LinearLayout.LayoutParams(-1, -2);
-        gridLp.setMargins(0, dp(5), 0, 0);
+        gridLp.setMargins(0, dp(4), 0, dp(4));
         calendarGrid.setLayoutParams(gridLp);
         content.addView(calendarGrid);
+
+        LinearLayout calendarActions = new LinearLayout(this);
+        calendarActions.setOrientation(LinearLayout.HORIZONTAL);
+        TextView share = action("SHARE MONTH", v -> shareMonth());
+        share.setTextSize(11);
+        share.setPadding(dp(4), dp(7), dp(4), dp(7));
+        share.setBackground(rounded(Color.rgb(15, 31, 49), dp(8), blue, 1));
+        TextView todayButton = action("JUMP TO TODAY", v -> {
+            Calendar today = Calendar.getInstance();
+            displayedMonth.setTimeInMillis(today.getTimeInMillis());
+            displayedMonth.set(Calendar.DAY_OF_MONTH, 1);
+            renderCalendar();
+            Toast.makeText(this, "Showing today: " + displayDate.format(today.getTime()), Toast.LENGTH_SHORT).show();
+        });
+        todayButton.setTextSize(11);
+        todayButton.setPadding(dp(4), dp(7), dp(4), dp(7));
+        LinearLayout.LayoutParams actionLeft = new LinearLayout.LayoutParams(0, dp(38), 1);
+        actionLeft.setMargins(0, 0, dp(3), 0);
+        LinearLayout.LayoutParams actionRight = new LinearLayout.LayoutParams(0, dp(38), 1);
+        actionRight.setMargins(dp(3), 0, 0, 0);
+        calendarActions.addView(share, actionLeft);
+        calendarActions.addView(todayButton, actionRight);
+        content.addView(calendarActions);
 
         renderCalendar();
     }
@@ -411,9 +414,9 @@ public class MainActivity extends Activity {
             h.setTextColor(Color.WHITE);
             h.setTextSize(9);
             h.setTypeface(Typeface.DEFAULT_BOLD);
-            h.setBackgroundColor(panel);
-            h.setPadding(0, dp(4), 0, dp(4));
-            h.setLayoutParams(equalGridParams(dp(25)));
+            h.setBackgroundColor(Color.argb(235, 13, 25, 39));
+            h.setPadding(0, dp(3), 0, dp(3));
+            h.setLayoutParams(equalGridParams(dp(23)));
             calendarGrid.addView(h);
         }
 
@@ -425,6 +428,7 @@ public class MainActivity extends Activity {
         Calendar today = Calendar.getInstance();
         int shownMonth = displayedMonth.get(Calendar.MONTH);
         int shownYear = displayedMonth.get(Calendar.YEAR);
+        int squareSize = calendarCellSizePx();
 
         for (int i = 0; i < 35; i++) {
             Calendar date = (Calendar) firstVisible.clone();
@@ -436,46 +440,59 @@ public class MainActivity extends Activity {
                     && date.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR);
 
             FrameLayout cell = new FrameLayout(this);
-            int cellColor = adjacentMonth ? Color.rgb(5, 13, 22) : Color.rgb(7, 17, 27);
-            cell.setAlpha(adjacentMonth ? 0.58f : 1f);
-            cell.setBackground(rounded(isToday ? Color.rgb(22, 48, 72) : cellColor,
+            int fill = adjacentMonth ? Color.argb(180, 5, 13, 22) : Color.argb(225, 7, 17, 27);
+            cell.setBackground(rounded(isToday ? Color.argb(235, 22, 48, 72) : fill,
                     0, isToday ? gold : Color.rgb(56, 73, 90), isToday ? 3 : 1));
             cell.setPadding(dp(1), dp(1), dp(1), dp(1));
-            cell.setLayoutParams(equalGridParams(dp(66)));
+            cell.setLayoutParams(equalGridParamsPx(squareSize));
 
             TextView number = new TextView(this);
             number.setText(String.valueOf(date.get(Calendar.DAY_OF_MONTH)));
             number.setTextColor(adjacentMonth ? muted : Color.WHITE);
-            number.setTextSize(11);
+            number.setTextSize(10);
             number.setTypeface(Typeface.DEFAULT_BOLD);
-            number.setPadding(dp(3), dp(1), 0, 0);
+            number.setPadding(dp(2), 0, 0, 0);
             cell.addView(number, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.LEFT));
 
             ShiftIconView icon = new ShiftIconView(this, status);
             FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(-1, -1);
-            iconLp.setMargins(dp(1), dp(5), dp(1), dp(15));
+            iconLp.setMargins(dp(1), dp(5), dp(1), dp(11));
             cell.addView(icon, iconLp);
 
-            String extras = extrasLabel(date);
-            String bottomText = extras;
+            String bottomText = extrasLabel(date);
             if (holiday != null) bottomText = (bottomText.isEmpty() ? "" : bottomText + " • ") + holiday;
             if (!bottomText.isEmpty()) {
-                TextView hol = new TextView(this);
-                hol.setText(bottomText);
-                hol.setTextColor(gold);
-                hol.setTextSize(5.8f);
-                hol.setTypeface(Typeface.DEFAULT_BOLD);
-                hol.setGravity(Gravity.CENTER);
-                hol.setSingleLine(true);
-                FrameLayout.LayoutParams hlp = new FrameLayout.LayoutParams(-1, dp(14), Gravity.BOTTOM);
-                hlp.setMargins(dp(1),0,dp(1),dp(1));
-                cell.addView(hol, hlp);
+                TextView detail = new TextView(this);
+                detail.setText(bottomText);
+                detail.setTextColor(gold);
+                detail.setTextSize(5.2f);
+                detail.setTypeface(Typeface.DEFAULT_BOLD);
+                detail.setGravity(Gravity.CENTER);
+                detail.setSingleLine(true);
+                FrameLayout.LayoutParams detailLp = new FrameLayout.LayoutParams(-1, dp(10), Gravity.BOTTOM);
+                detailLp.setMargins(dp(1), 0, dp(1), 0);
+                cell.addView(detail, detailLp);
             }
 
             final Calendar selectedDate = (Calendar) date.clone();
             cell.setOnClickListener(v -> editDate(selectedDate));
             calendarGrid.addView(cell);
         }
+    }
+
+    private int calendarCellSizePx() {
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        int available = screenWidth - dp(12) - 14;
+        return Math.max(dp(42), available / 7);
+    }
+
+    private GridLayout.LayoutParams equalGridParamsPx(int heightPx) {
+        GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
+        lp.width = 0;
+        lp.height = heightPx;
+        lp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
+        lp.setMargins(1, 1, 1, 1);
+        return lp;
     }
 
     private GridLayout.LayoutParams equalGridParams(int heightDp) {
@@ -649,18 +666,6 @@ public class MainActivity extends Activity {
         startActivity(Intent.createChooser(send, "Share monthly schedule"));
     }
 
-    private void addTwoColumnViews(View left, View right) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(0, -2, 1);
-        LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(0, -2, 1);
-        lp1.setMargins(0, dp(3), dp(3), dp(3));
-        lp2.setMargins(dp(3), dp(3), 0, dp(3));
-        row.addView(left, lp1);
-        row.addView(right, lp2);
-        content.addView(row);
-    }
-
     private void showPayrollScreen() {
         baseScreen("PAYROLL");
 
@@ -671,8 +676,10 @@ public class MainActivity extends Activity {
         EditText court = input("Court pay per subpoena", formatRate(getDouble("court_rate", 50)), true);
         EditText supplement = input("Supplemental pay per eligible check", formatRate(getDouble("supplement", 0)), true);
 
-        addTwoColumnViews(labeledField("HOURLY RATE", hourly), labeledField("OVERTIME RATE", overtime));
-        addTwoColumnViews(labeledField("COURT PAY", court), labeledField("SUPPLEMENTAL PAY", supplement));
+        content.addView(labeledField("HOURLY RATE", hourly));
+        content.addView(labeledField("OVERTIME RATE", overtime));
+        content.addView(labeledField("COURT PAY PER SUBPOENA", court));
+        content.addView(labeledField("SUPPLEMENTAL PAY", supplement));
 
         TextView saveRates = action("SAVE PAY RATES & RECALCULATE", v -> {
             prefs.edit()
@@ -753,25 +760,21 @@ public class MainActivity extends Activity {
         double net = moneyValue(bd(gross).subtract(bd(health)).subtract(bd(retirement)).subtract(bd(federalTax))
                 .subtract(bd(stateTax)).subtract(bd(medicare)).subtract(bd(other)));
 
-        content.addView(section("PAY & LEAVE DASHBOARD"));
-        addTwoColumnViews(summaryCard("VACATION BANK", getDouble("vacation_balance", 0) + " hrs", "☀"),
-                summaryCard("SICK BANK", getDouble("sick_balance", 0) + " hrs", "+"));
-        addTwoColumnViews(summaryCard("COMP BANK", getDouble("comp_balance", 0) + " hrs", "★"),
-                summaryCard("PAID LEAVE", paidLeave + " hrs", "☂"));
-        addTwoColumnViews(summaryCard("ACTUAL WORKED", actualWorked + " hrs", "⚡"),
-                summaryCard("OVERTIME", overtimeHours + " hrs • " + money(overtimePay), "⏱"));
-        addTwoColumnViews(summaryCard("REGULAR PAY", money(regularPay), "$"),
-                summaryCard("HOLIDAY", holidayHours + " hrs • " + money(holidayPay), "★"));
-        addTwoColumnViews(summaryCard("COURT", courtHours + " hrs • " + money(courtPay), "⚖"),
-                summaryCard("SUPPLEMENT", money(supplementalPay), "✦"));
-        addTwoColumnViews(summaryCard("GROSS CHECK", money(gross), "$"),
-                summaryCard("NET CHECK", money(net), "$"));
-        addTwoColumnViews(summaryCard("BENEFITS", healthApplies ? money(health) : "$0.00 • third check", "✚"),
-                summaryCard("RETIREMENT", money(retirement), "★"));
-        addTwoColumnViews(summaryCard("FEDERAL TAX", money(federalTax), "F"),
-                summaryCard("LOUISIANA TAX", money(stateTax), "LA"));
-        addTwoColumnViews(summaryCard("MEDICARE", money(medicare), "MC"),
-                summaryCard("COMP EARNED", compEarned + " hrs", "★"));
+        content.addView(summaryCard("ACTUAL WORKED", actualWorked + " hrs", "⚡"));
+        content.addView(summaryCard("PAID LEAVE", paidLeave + " hrs", "☂"));
+        content.addView(summaryCard("REGULAR PAY", money(regularPay), "$"));
+        content.addView(summaryCard("OVERTIME", overtimeHours + " hrs  •  " + money(overtimePay), "⏱"));
+        content.addView(summaryCard("HOLIDAY PREMIUM", holidayHours + " hrs  •  " + money(holidayPay), "★"));
+        content.addView(summaryCard("COMP EARNED", compEarned + " hrs", "★"));
+        content.addView(summaryCard("COURT", courtHours + " hrs  •  " + money(courtPay), "⚖"));
+        content.addView(summaryCard("SUPPLEMENTAL PAY", money(supplementalPay), "✦"));
+        content.addView(summaryCard("ESTIMATED GROSS CHECK", money(gross), "$"));
+        content.addView(summaryCard("PRETAX INSURANCE & BENEFITS", healthApplies ? money(health) : "$0.00 • third check", "✚"));
+        content.addView(summaryCard("RETIREMENT", money(retirement), "★"));
+        content.addView(summaryCard("FEDERAL WITHHOLDING", money(federalTax), "F"));
+        content.addView(summaryCard("LOUISIANA WITHHOLDING", money(stateTax), "LA"));
+        content.addView(summaryCard("MEDICARE", money(medicare), "MC"));
+        content.addView(summaryCard("ESTIMATED NET CHECK", money(net), "$"));
 
         if (compEarned > 0) {
             content.addView(action("ADD EARNED COMP TO BANK", v -> {
@@ -1111,8 +1114,26 @@ public class MainActivity extends Activity {
         p.setColor(Color.rgb(80,190,105)); for(int i=-3;i<=3;i++){ float dx=i*115; c.save(); c.rotate(i*12,x+dx,y-5-Math.abs(i)*22); c.drawRect(x+dx-30,y-20-Math.abs(i)*25,x+dx+30,y+15-Math.abs(i)*25,p); c.restore(); }
     }
 
-     
-    
+    private void sharePayStubSnapshotImage(JSONObject o, Calendar start, Calendar end) {
+        try {
+            Bitmap bmp=Bitmap.createBitmap(1080,1350,Bitmap.Config.ARGB_8888); Canvas c=new Canvas(bmp); Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
+            p.setColor(Color.rgb(5,14,25)); c.drawRect(0,0,1080,1350,p); p.setColor(Color.rgb(19,38,58)); c.drawRoundRect(new RectF(45,45,1035,1305),34,34,p);
+            p.setTextAlign(Paint.Align.CENTER); p.setTypeface(Typeface.DEFAULT_BOLD); p.setColor(Color.WHITE); p.setTextSize(70); c.drawText("BOLO BOARD PAY STUB",540,135,p);
+            p.setTextSize(40); p.setColor(gold); c.drawText(o.optString("name",activeProfile),540,195,p);
+            p.setTextSize(25); p.setColor(silver); c.drawText("Pay date: "+displayDate.format(new Date(o.optLong("payday"))),540,238,p);
+            c.drawText("Pay period: "+displayDate.format(start.getTime())+" – "+displayDate.format(end.getTime()),540,275,p);
+            drawMoneyOfficer(c,p,540,415); p.setTextAlign(Paint.Align.LEFT); int y=595;
+            y=stubLine(c,p,"Actual hours worked",String.format(Locale.US,"%.1f",o.optDouble("worked")),y);
+            y=stubLine(c,p,"Paid leave hours",String.format(Locale.US,"%.1f",o.optDouble("leave")),y);
+            y=stubLine(c,p,"Regular wages",money(o.optDouble("regularPay")),y); y=stubLine(c,p,"Overtime ("+String.format(Locale.US,"%.1f",o.optDouble("otHours"))+" hrs)",money(o.optDouble("otPay")),y);
+            y=stubLine(c,p,"Court pay",money(o.optDouble("courtPay")),y); y=stubLine(c,p,"Supplemental pay",money(o.optDouble("supplement")),y); y=stubLine(c,p,"Gross pay",money(o.optDouble("gross")),y);
+            y=stubLine(c,p,"Health insurance",money(o.optDouble("health")),y); y=stubLine(c,p,"Retirement",money(o.optDouble("retirement")),y); y=stubLine(c,p,"Federal withholding",money(o.optDouble("federal")),y); y=stubLine(c,p,"Louisiana withholding",money(o.optDouble("state")),y); y=stubLine(c,p,"Other deductions",money(o.optDouble("other")),y);
+            p.setColor(gold); p.setTextSize(46); p.setTypeface(Typeface.DEFAULT_BOLD); c.drawText("NET",85,y+40,p); p.setTextAlign(Paint.Align.RIGHT); c.drawText(money(o.optDouble("net")),995,y+40,p);
+            p.setTextAlign(Paint.Align.LEFT); p.setTextSize(28); p.setColor(silver); c.drawText("BANKS  •  Vacation "+formatHours(o.optDouble("vacation"))+"   Sick "+formatHours(o.optDouble("sick"))+"   Comp "+formatHours(o.optDouble("comp")),85,y+105,p);
+            File dir=new File(getCacheDir(),"shared"); dir.mkdirs(); File f=new File(dir,"bolo-paystub-"+o.optLong("payday")+"-"+System.currentTimeMillis()+".png"); FileOutputStream out=new FileOutputStream(f); bmp.compress(Bitmap.CompressFormat.PNG,100,out); out.close();
+            Uri uri=FileProvider.getUriForFile(this,getPackageName()+".fileprovider",f); Intent send=new Intent(Intent.ACTION_SEND); send.setType("image/png"); send.putExtra(Intent.EXTRA_STREAM,uri); send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); startActivity(Intent.createChooser(send,"Share saved pay stub"));
+        } catch(Exception e){ Toast.makeText(this,"Unable to create saved pay stub image",Toast.LENGTH_LONG).show(); }
+    }
 
     private String formatRate(double value) {
         if (value == 0) return "";
@@ -1354,60 +1375,15 @@ public class MainActivity extends Activity {
             super.onDraw(c);
             int w = getWidth();
             int h = getHeight();
-
-            LinearGradient bg = new LinearGradient(
-                    0, 0, 0, h,
-                    Color.rgb(2, 8, 15),
-                    Color.rgb(8, 28, 49),
-                    Shader.TileMode.CLAMP
-            );
-            p.setShader(bg);
+            p.setColor(Color.argb(225, 2, 8, 15));
             c.drawRect(0, 0, w, h, p);
-            p.setShader(null);
-
-            drawExplorerBanner(c, w, h);
-
-            // Dark top fade keeps the title readable over the supplied artwork.
-            p.setShader(new LinearGradient(0, 0, 0, dp(82), Color.argb(220, 0, 7, 15), Color.TRANSPARENT, Shader.TileMode.CLAMP));
-            c.drawRect(0, 0, w, dp(92), p);
-            p.setShader(null);
-
             p.setTextAlign(Paint.Align.CENTER);
             p.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
-            p.setTextSize(dp(29));
-            p.setShadowLayer(dp(5), 0, dp(2), Color.BLACK);
+            p.setTextSize(dp(27));
+            p.setShadowLayer(dp(3), 0, dp(1), Color.BLACK);
             p.setColor(Color.WHITE);
-            c.drawText("BOLO BOARD", w / 2f, dp(42), p);
+            c.drawText("BOLO BOARD", w / 2f, dp(39), p);
             p.clearShadowLayer();
-        }
-
-        private void drawExplorerBanner(Canvas c, int w, int h) {
-            Bitmap banner = BitmapFactory.decodeResource(getResources(), R.drawable.police_explorer_banner);
-            if (banner == null) return;
-
-            float scale = Math.max((float) w / banner.getWidth(), (float) h / banner.getHeight());
-            float scaledW = banner.getWidth() * scale;
-            float scaledH = banner.getHeight() * scale;
-            float left = (w - scaledW) / 2f;
-            float top = (h - scaledH) / 2f;
-
-            RectF destination = new RectF(left, top, left + scaledW, top + scaledH);
-            p.setFilterBitmap(true);
-            c.drawBitmap(banner, null, destination, p);
-
-            // Subtle dark overlay blends the artwork with the app's navy interface.
-            p.setShader(new LinearGradient(0, h * 0.35f, 0, h, Color.TRANSPARENT, Color.argb(135, 3, 12, 23), Shader.TileMode.CLAMP));
-            c.drawRect(0, 0, w, h, p);
-            p.setShader(null);
-
-            // Animated emergency-light wash across the banner.
-            boolean flash = (System.currentTimeMillis() / 420L) % 2L == 0L;
-            p.setShader(new RadialGradient(w * .39f, h * .31f, w * .34f, flash ? Color.argb(125, 25, 110, 255) : Color.argb(22, 25, 110, 255), Color.TRANSPARENT, Shader.TileMode.CLAMP));
-            c.drawRect(0, 0, w, h, p);
-            p.setShader(new RadialGradient(w * .58f, h * .31f, w * .34f, flash ? Color.argb(22, 255, 40, 55) : Color.argb(125, 255, 40, 55), Color.TRANSPARENT, Shader.TileMode.CLAMP));
-            c.drawRect(0, 0, w, h, p);
-            p.setShader(null);
-            postInvalidateDelayed(120);
         }
     }
 
@@ -1426,24 +1402,15 @@ public class MainActivity extends Activity {
             float w = getWidth();
             float h = getHeight();
             float cx = w / 2f;
-            long now = System.currentTimeMillis();
-            float wave = (float)Math.sin(now / 260.0);
-            float pulse = 0.91f + 0.12f * (wave + 1f) / 2f;
-            float r = Math.min(w, h) * .34f * pulse;
-            float y = h * .38f;
+            float pulse = 1.0f;
+            float r = Math.min(w, h) * .31f * pulse;
 
-            c.save();
-            if (status.equals("Night Shift")) c.translate(0, wave * dp(2));
-            if (status.equals("Vacation")) c.translate(0, Math.abs(wave) * dp(2));
-            if (status.equals("Sick")) c.rotate(wave * 3.2f, cx, y);
-            if (status.equals("Day Shift")) drawSunOfficer(c, cx, y, r);
-            else if (status.equals("Night Shift")) drawMoonOfficer(c, cx, y, r);
-            else if (status.equals("Vacation")) drawVacationCar(c, cx, y, r);
-            else if (status.equals("Day Off")) drawOffBadge(c, cx, y, r);
-            else if (status.equals("Sick")) drawSickCar(c, cx, y, r);
-            else drawSpecial(c, cx, y, r, status);
-            c.restore();
-            postInvalidateDelayed(70);
+            if (status.equals("Day Shift")) drawSunOfficer(c, cx, h * .39f, r);
+            else if (status.equals("Night Shift")) drawMoonOfficer(c, cx, h * .39f, r);
+            else if (status.equals("Vacation")) drawVacationCar(c, cx, h * .39f, r);
+            else if (status.equals("Day Off")) drawOffBadge(c, cx, h * .39f, r);
+            else if (status.equals("Sick")) drawSickCar(c, cx, h * .39f, r);
+            else drawSpecial(c, cx, h * .39f, r, status);
 
             p.setTextAlign(Paint.Align.CENTER);
             p.setTypeface(Typeface.DEFAULT_BOLD);
@@ -1521,13 +1488,10 @@ public class MainActivity extends Activity {
             c.drawCircle(x - r * .58f, y + r * .30f, r * .20f, p);
             c.drawCircle(x + r * .58f, y + r * .30f, r * .20f, p);
 
-            boolean flash = (System.currentTimeMillis() / 220L) % 2L == 0L;
-            p.setShadowLayer(r * .28f, 0, 0, flash ? blue : red);
-            p.setColor(flash ? Color.CYAN : Color.rgb(25,65,110));
-            c.drawRect(x - r * .16f, y - r * .84f, x, y - r * .67f, p);
-            p.setColor(flash ? Color.rgb(90,15,25) : Color.RED);
-            c.drawRect(x, y - r * .84f, x + r * .16f, y - r * .67f, p);
-            p.clearShadowLayer();
+            p.setColor(blue);
+            c.drawRect(x - r * .12f, y - r * .81f, x, y - r * .68f, p);
+            p.setColor(red);
+            c.drawRect(x, y - r * .81f, x + r * .12f, y - r * .68f, p);
 
             p.setColor(Color.rgb(255, 225, 92));
             c.save();
@@ -1548,11 +1512,7 @@ public class MainActivity extends Activity {
             p.setColor(Color.rgb(18, 31, 46));
             Path roof = new Path(); roof.moveTo(x-r*.48f,y-r*.28f); roof.lineTo(x-r*.20f,y-r*.67f); roof.lineTo(x+r*.42f,y-r*.67f); roof.lineTo(x+r*.68f,y-r*.28f); roof.close(); c.drawPath(roof,p);
             p.setColor(Color.BLACK); c.drawCircle(x-r*.58f,y+r*.31f,r*.20f,p); c.drawCircle(x+r*.58f,y+r*.31f,r*.20f,p);
-            boolean flash = (System.currentTimeMillis() / 240L) % 2L == 0L;
-            p.setShadowLayer(r * .24f, 0, 0, flash ? blue : red);
-            p.setColor(flash ? Color.CYAN : Color.rgb(25,65,110)); c.drawRect(x-r*.16f,y-r*.83f,x,y-r*.66f,p);
-            p.setColor(flash ? Color.rgb(90,15,25) : Color.RED); c.drawRect(x,y-r*.83f,x+r*.16f,y-r*.66f,p);
-            p.clearShadowLayer();
+            p.setColor(blue); c.drawRect(x-r*.14f,y-r*.80f,x,y-r*.67f,p); p.setColor(red); c.drawRect(x,y-r*.80f,x+r*.14f,y-r*.67f,p);
             p.setColor(Color.rgb(22, 34, 48)); c.drawRect(x-r*.22f,y-r*.03f,x+r*.22f,y+r*.20f,p);
             p.setStrokeWidth(Math.max(3f,r*.10f)); p.setStrokeCap(Paint.Cap.ROUND); p.setColor(Color.WHITE); c.drawLine(x+r*.10f,y+r*.05f,x+r*.56f,y-r*.48f,p);
             p.setColor(red); c.drawCircle(x+r*.62f,y-r*.56f,r*.14f,p); p.setStrokeCap(Paint.Cap.BUTT);
