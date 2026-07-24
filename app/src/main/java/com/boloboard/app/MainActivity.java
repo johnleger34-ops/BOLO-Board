@@ -82,6 +82,18 @@ public class MainActivity extends Activity {
         SharedPreferences alexis = getSharedPreferences(PREFS + "_alexis", MODE_PRIVATE);
         if (!john.contains("officer_name")) john.edit().putString("officer_name", "J. Leger").putString("rank", "Lieutenant").apply();
         if (!alexis.contains("officer_name")) alexis.edit().putString("officer_name", "A. Leger").putString("rank", "Corporal").apply();
+
+        // One-time John-only payroll migration from official Town of Church Point check stubs.
+        // It auto-applies the verified defaults once; every field remains editable afterward.
+        if (!john.getBoolean("john_stub_defaults_v1", false)) {
+            john.edit()
+                    .putString("retirement_percent", "10")
+                    .putString("social_security_percent", "6.2")
+                    .putString("health_deduction", "86.77")
+                    .putString("supplement", "300")
+                    .putBoolean("john_stub_defaults_v1", true)
+                    .apply();
+        }
         // Preserve editable rates, but migrate the rounded Alexis rates used by older builds
         // to the exact values proven by the official 84-hour + 12-hour OT pay stub.
         String alexisHourly = alexis.getString("hourly_rate", "");
@@ -749,16 +761,19 @@ public class MainActivity extends Activity {
         boolean healthApplies = paycheckOccurrenceInMonth(paydayForPeriod) <= 2;
         double health = healthApplies ? getDouble("health_deduction", 0) : 0;
         double taxableGross = Math.max(0, gross - health);
-        double retirementBase = regularPay + holidayPay + supplementalPay;
-        double retirement = moneyValue(bd(retirementBase).multiply(bd(getDouble("retirement_percent", 0))).divide(new BigDecimal("100"), 12, RoundingMode.HALF_UP));
+        // John contributes retirement on every earning code, including OT and court pay.
+        // Alexis keeps the original retirement base used by her employer.
+        double retirementBase = activeProfile.equals("John") ? gross : regularPay + holidayPay + supplementalPay;
+        double retirement = moneyValue(bd(retirementBase).multiply(bd(getDouble("retirement_percent", activeProfile.equals("John") ? 10 : 0))).divide(new BigDecimal("100"), 12, RoundingMode.HALF_UP));
         double federalTax = moneyValue(bd(estimateFederalWithholding(gross, getString("federal_status", FEDERAL_STATUSES[0]),
                 (int)getDouble("federal_children", 0), (int)getDouble("federal_other_dependents", 0))).add(bd(getDouble("federal_extra", 0))));
         double stateTax = moneyValue(bd(estimateLouisianaWithholding(gross, getString("state_status", LOUISIANA_STATUSES[0]),
                 (int)getDouble("state_dependents", 0))).add(bd(getDouble("state_extra", 0))));
+        double socialSecurity = moneyValue(bd(gross).multiply(bd(getDouble("social_security_percent", activeProfile.equals("John") ? 6.2 : 0))).divide(new BigDecimal("100"), 12, RoundingMode.HALF_UP));
         double medicare = moneyValue(bd(gross).multiply(new BigDecimal("0.0145")));
         double other = moneyValue(bd(getDouble("other_deductions", 0)));
         double net = moneyValue(bd(gross).subtract(bd(health)).subtract(bd(retirement)).subtract(bd(federalTax))
-                .subtract(bd(stateTax)).subtract(bd(medicare)).subtract(bd(other)));
+                .subtract(bd(stateTax)).subtract(bd(socialSecurity)).subtract(bd(medicare)).subtract(bd(other)));
 
         content.addView(summaryCard("ACTUAL WORKED", actualWorked + " hrs", "⚡"));
         content.addView(summaryCard("PAID LEAVE", paidLeave + " hrs", "☂"));
@@ -773,6 +788,7 @@ public class MainActivity extends Activity {
         content.addView(summaryCard("RETIREMENT", money(retirement), "★"));
         content.addView(summaryCard("FEDERAL WITHHOLDING", money(federalTax), "F"));
         content.addView(summaryCard("LOUISIANA WITHHOLDING", money(stateTax), "LA"));
+        content.addView(summaryCard("SOCIAL SECURITY", money(socialSecurity), "SS"));
         content.addView(summaryCard("MEDICARE", money(medicare), "MC"));
         content.addView(summaryCard("ESTIMATED NET CHECK", money(net), "$"));
 
@@ -912,14 +928,21 @@ public class MainActivity extends Activity {
     }
 
     private double estimateFederalWithholding(double grossPay, String status, int qualifyingChildren, int otherDependents) {
-        // Employer-pattern estimate validated against five actual Alexis pay stubs.
-        // For Married Filing Jointly with one dependent, interpolate between observed gross/tax pairs.
+        if (activeProfile.equals("John")) {
+            // John employer-pattern estimate from official checks:
+            // $1,862 gross -> $77.01 federal; $2,055 gross -> $94.38 federal.
+            double[] grossPoints = {1862.00, 2055.00};
+            double[] taxPoints = {77.01, 94.38};
+            double tax = interpolateTax(grossPay, grossPoints, taxPoints);
+            return roundMoney(Math.max(0, tax));
+        }
+
+        // Alexis employer-pattern estimate validated against her five actual pay stubs.
         double[] grossPoints = {1615.38, 1644.23, 2066.62, 2307.69, 2461.54};
         double[] taxPoints   = {  10.19,   13.65,   57.75,   93.17,  109.83};
         double tax = interpolateTax(grossPay, grossPoints, taxPoints);
         int dependents = Math.max(0, qualifyingChildren) + Math.max(0, otherDependents);
         if (!status.equals(FEDERAL_STATUSES[1])) tax *= status.equals(FEDERAL_STATUSES[2]) ? 1.12 : 1.28;
-        // The observed baseline is one dependent. Adjust gently for different elections.
         tax -= (dependents - 1) * 18.0;
         return roundMoney(Math.max(0, tax));
     }
@@ -943,7 +966,16 @@ public class MainActivity extends Activity {
     }
 
     private double estimateLouisianaWithholding(double grossPay, String status, int dependents) {
-        // Employer-pattern estimate validated against five actual Alexis pay stubs.
+        if (activeProfile.equals("John")) {
+            // John employer-pattern estimate from official checks:
+            // $1,862 gross -> $24.99 state; $2,055 gross -> $30.36 state.
+            double[] grossPoints = {1862.00, 2055.00};
+            double[] taxPoints = {24.99, 30.36};
+            double tax = interpolateTax(grossPay, grossPoints, taxPoints);
+            return roundMoney(Math.max(0, tax));
+        }
+
+        // Alexis employer-pattern estimate validated against her five actual pay stubs.
         double[] grossPoints = {1615.38, 1644.23, 2066.62, 2307.69, 2461.54};
         double[] taxPoints   = {  27.77,   28.66,   40.97,   49.14,   53.43};
         double tax = interpolateTax(grossPay, grossPoints, taxPoints);
@@ -964,8 +996,9 @@ public class MainActivity extends Activity {
             Calendar payday = paydayForPeriod(start);
             boolean healthApplies = paycheckOccurrenceInMonth(payday) <= 2;
             double health = healthApplies ? moneyValue(bd(getDouble("health_deduction", 0))) : 0;
-            double retirement = moneyValue(bd(regularPay + holidayPay + supplement)
-                    .multiply(bd(getDouble("retirement_percent", 0)))
+            double retirementBase = activeProfile.equals("John") ? gross : regularPay + holidayPay + supplement;
+            double retirement = moneyValue(bd(retirementBase)
+                    .multiply(bd(getDouble("retirement_percent", activeProfile.equals("John") ? 10 : 0)))
                     .divide(new BigDecimal("100"), 12, RoundingMode.HALF_UP));
             double federal = moneyValue(bd(estimateFederalWithholding(gross,
                     getString("federal_status", FEDERAL_STATUSES[0]),
@@ -976,10 +1009,11 @@ public class MainActivity extends Activity {
                     getString("state_status", LOUISIANA_STATUSES[0]),
                     (int)getDouble("state_dependents", 0)))
                     .add(bd(getDouble("state_extra", 0))));
+            double socialSecurity = moneyValue(bd(gross).multiply(bd(getDouble("social_security_percent", activeProfile.equals("John") ? 6.2 : 0))).divide(new BigDecimal("100"), 12, RoundingMode.HALF_UP));
             double medicare = moneyValue(bd(gross).multiply(new BigDecimal("0.0145")));
             double other = moneyValue(bd(getDouble("other_deductions", 0)));
             double net = moneyValue(bd(gross).subtract(bd(health)).subtract(bd(retirement))
-                    .subtract(bd(federal)).subtract(bd(state)).subtract(bd(medicare)).subtract(bd(other)));
+                    .subtract(bd(federal)).subtract(bd(state)).subtract(bd(socialSecurity)).subtract(bd(medicare)).subtract(bd(other)));
 
             o.put("id", payday.getTimeInMillis());
             o.put("payday", payday.getTimeInMillis());
@@ -990,7 +1024,7 @@ public class MainActivity extends Activity {
             o.put("regularPay", regularPay); o.put("holidayPay", holidayPay); o.put("otPay", otPay);
             o.put("courtPay", courtPay); o.put("supplement", supplement); o.put("gross", gross);
             o.put("health", health); o.put("retirement", retirement); o.put("federal", federal);
-            o.put("state", state); o.put("medicare", medicare); o.put("other", other); o.put("net", net);
+            o.put("state", state); o.put("socialSecurity", socialSecurity); o.put("medicare", medicare); o.put("other", other); o.put("net", net);
             o.put("vacation", getDouble("vacation_balance", 0));
             o.put("sick", getDouble("sick_balance", 0));
             o.put("comp", getDouble("comp_balance", 0));
@@ -1048,6 +1082,7 @@ public class MainActivity extends Activity {
                 "Holiday pay: "+money(o.optDouble("holidayPay"))+"\n"+
                 "Federal: "+money(o.optDouble("federal"))+"\n"+
                 "Louisiana: "+money(o.optDouble("state"))+"\n"+
+                "Social Security: "+money(o.optDouble("socialSecurity"))+"\n"+
                 "Medicare: "+money(o.optDouble("medicare"))+"\n"+
                 "Retirement: "+money(o.optDouble("retirement"))+"\n"+
                 "Health: "+money(o.optDouble("health"))+"\n"+
@@ -1090,6 +1125,7 @@ public class MainActivity extends Activity {
             y=funStubLine(c,p,"Retirement: future fishing fund",money(o.optDouble("retirement")),y);
             y=funStubLine(c,p,"Federal donut tax",money(o.optDouble("federal")),y);
             y=funStubLine(c,p,"Louisiana fun tax",money(o.optDouble("state")),y);
+            y=funStubLine(c,p,"Social Security contribution",money(o.optDouble("socialSecurity")),y);
             y=funStubLine(c,p,"Medicare contribution",money(o.optDouble("medicare")),y);
             y=funStubLine(c,p,"Other deductions: cuffs, keys & snacks",money(o.optDouble("other")),y);
             p.setColor(gold); p.setTextSize(46); p.setTypeface(Typeface.DEFAULT_BOLD); p.setTextAlign(Paint.Align.LEFT); c.drawText("GRAND NET TOTAL",86,1610,p); p.setTextAlign(Paint.Align.RIGHT); c.drawText(money(o.optDouble("net")),994,1610,p);
@@ -1241,7 +1277,8 @@ public class MainActivity extends Activity {
         EditText federalChildren = input("Number of qualifying children under 17", formatRate(getDouble("federal_children", 0)), true);
         EditText federalOtherDependents = input("Number of other dependents", formatRate(getDouble("federal_other_dependents", 0)), true);
         EditText stateDependents = input("Louisiana dependents / exemptions", formatRate(getDouble("state_dependents", 0)), true);
-        EditText retirement = input("Retirement percentage", formatRate(getDouble("retirement_percent", 0)), true);
+        EditText retirement = input("Retirement percentage", formatRate(getDouble("retirement_percent", activeProfile.equals("John") ? 10 : 0)), true);
+        EditText socialSecurity = input("Social Security percentage", formatRate(getDouble("social_security_percent", activeProfile.equals("John") ? 6.2 : 0)), true);
         EditText federalExtra = input("Extra federal dollars per check", formatRate(getDouble("federal_extra", 0)), true);
         EditText stateExtra = input("Extra Louisiana dollars per check", formatRate(getDouble("state_extra", 0)), true);
         EditText health = input("Pretax insurance & benefits per check", formatRate(getDouble("health_deduction", 0)), true);
@@ -1253,6 +1290,7 @@ public class MainActivity extends Activity {
         content.addView(labeledField("FEDERAL OTHER DEPENDENTS", federalOtherDependents));
         content.addView(labeledField("LOUISIANA DEPENDENTS / EXEMPTIONS", stateDependents));
         content.addView(labeledField("RETIREMENT %", retirement));
+        content.addView(labeledField("SOCIAL SECURITY %", socialSecurity));
         content.addView(labeledField("ADDITIONAL FEDERAL WITHHOLDING", federalExtra));
         content.addView(labeledField("ADDITIONAL LOUISIANA WITHHOLDING", stateExtra));
         content.addView(labeledField("PRETAX INSURANCE & BENEFITS — FIRST TWO CHECKS EACH MONTH", health));
@@ -1282,6 +1320,7 @@ public class MainActivity extends Activity {
                     .putString("federal_other_dependents", federalOtherDependents.getText().toString())
                     .putString("state_dependents", stateDependents.getText().toString())
                     .putString("retirement_percent", retirement.getText().toString())
+                    .putString("social_security_percent", socialSecurity.getText().toString())
                     .putString("federal_extra", federalExtra.getText().toString()).putString("state_extra", stateExtra.getText().toString())
                     .putString("health_deduction", health.getText().toString()).putString("other_deductions", deductions.getText().toString())
                     .putString("vacation_balance", vacation.getText().toString()).putString("sick_balance", sick.getText().toString())
