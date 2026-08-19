@@ -3,14 +3,14 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
-        android:name=".FamilySyncFixedApp"
+        android:name=".FamilySyncResilientApp"
         android:allowBackup="true"
         android:icon="@drawable/app_icon"
         android:label="BOLO Board"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
-            android:name=".MainActivity"
+            android:name=".MainActivityV2"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>
@@ -19,15 +19,14 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
             android:name=".FamilySyncActivity"
-            android:exported="true"
+            android:exported="false"
             android:label="BOLO Family Sync"
-            android:screenOrientation="portrait">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:screenOrientation="portrait" />
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
