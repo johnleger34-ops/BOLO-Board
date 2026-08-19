@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
-        android:name=".BoloBoardApp"
+        android:name=".FamilySyncFixedApp"
         android:allowBackup="true"
         android:icon="@drawable/app_icon"
         android:label="BOLO Board"
