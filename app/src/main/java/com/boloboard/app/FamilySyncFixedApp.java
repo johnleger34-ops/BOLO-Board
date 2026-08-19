@@ -32,15 +32,16 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * Drop-in transport repair for BOLO Family Sync.
+ * BOLO Family Sync transport.
  *
- * The previous build attempted to create a jsonblob.io object by POSTing directly
- * to a client-generated UUID. That path can return HTTP 403. This implementation
- * uses jsonblob.io's documented anonymous create endpoint, reads the server-issued
- * x-blob-uuid, and then uses that UUID for subsequent reads and version updates.
+ * New boards use jsonblob.io's documented anonymous create endpoint. The cloud
+ * payload is AES-GCM encrypted before upload and this transport never clears the
+ * local John/Alexis data when a network request fails.
  *
- * Existing BOLO preferences and pairing-code format are preserved. No profile,
- * payroll, leave, schedule, or local board data is cleared by this class.
+ * Important: jsonblob.io documents its API with curl-style POST requests. A
+ * browser-identifying Android request can be rejected with HTTP 403 by the edge
+ * layer, so this version intentionally uses a minimal curl-compatible request
+ * profile rather than pretending to be Chrome.
  */
 public class FamilySyncFixedApp extends BoloBoardApp {
     private static final String API_BASE = "https://jsonblob.io";
@@ -116,7 +117,6 @@ public class FamilySyncFixedApp extends BoloBoardApp {
                 if (parts[1].trim().isEmpty() || parts[2].trim().isEmpty()) throw new Exception("Invalid BOLO pairing code");
 
                 if ("BB1".equals(parts[0])) {
-                    // Preserve backwards compatibility with the original implementation.
                     busy.set(false);
                     super.joinFamilySync(pairingCode, callback);
                     return;
@@ -347,10 +347,11 @@ public class FamilySyncFixedApp extends BoloBoardApp {
         conn.setRequestMethod(method);
         conn.setConnectTimeout(15000);
         conn.setReadTimeout(15000);
-        conn.setRequestProperty("Accept", "application/json, text/plain, */*");
-        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=utf-8");
-        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/126 Mobile Safari/537.36");
-        conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9");
+        conn.setRequestProperty("Accept", "*/*");
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        conn.setRequestProperty("User-Agent", "curl/8.5.0");
+        conn.setRequestProperty("Cache-Control", "no-cache");
+        conn.setRequestProperty("Connection", "close");
         conn.setUseCaches(false);
         conn.setInstanceFollowRedirects(true);
         return conn;
