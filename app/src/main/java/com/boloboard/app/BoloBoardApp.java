@@ -2,14 +2,12 @@ package com.boloboard.app;
 
 import android.app.Activity;
 import android.app.Application;
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Base64;
-import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -27,6 +25,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -49,7 +48,9 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
     public static final String KEY_PROMPT_DISMISSED = "family_sync_prompt_dismissed";
     public static final String KEY_SAFETY = "family_sync_safety_snapshot";
 
-    private static final String API_BASE = "https://jsonblob.com/api/jsonBlob";
+    private static final String LEGACY_API_BASE = "https://jsonblob.com/api/jsonBlob";
+    private static final String FAMILY_API_BASE = "https://jsonblob.io";
+    private static final String FAMILY_PREFIX = "io_";
     private static final long POLL_MS = 15000L;
     private static final long PUSH_DEBOUNCE_MS = 1400L;
 
@@ -95,7 +96,12 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
 
     public String getPairingCode() {
         if (!isConfigured()) return "";
-        return "BB1:" + global.getString(KEY_BLOB, "") + ":" + global.getString(KEY_SECRET, "");
+        String blob = global.getString(KEY_BLOB, "");
+        String secret = global.getString(KEY_SECRET, "");
+        if (blob.startsWith(FAMILY_PREFIX)) {
+            return "BB2:" + blob.substring(FAMILY_PREFIX.length()) + ":" + secret;
+        }
+        return "BB1:" + blob + ":" + secret;
     }
 
     public String statusText() {
@@ -126,7 +132,8 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
         io.execute(() -> {
             try {
                 saveSafetySnapshot();
-                byte[] key = new byte[32]; random.nextBytes(key);
+                byte[] key = new byte[32];
+                random.nextBytes(key);
                 String encodedKey = Base64.encodeToString(key, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
                 long now = System.currentTimeMillis();
                 JSONObject doc = buildLocalDocument(now, now);
@@ -141,7 +148,7 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
                         .remove(KEY_LAST_ERROR)
                         .putBoolean(KEY_PROMPT_DISMISSED, true)
                         .apply();
-                complete(callback, true, "Family sync created");
+                complete(callback, true, "Family sync created • local data kept safely on this phone");
             } catch (Exception e) {
                 complete(callback, false, cleanError(e));
             } finally {
@@ -158,16 +165,21 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
         io.execute(() -> {
             try {
                 String[] parts = pairingCode == null ? new String[0] : pairingCode.trim().split(":", 3);
-                if (parts.length != 3 || !"BB1".equals(parts[0]) || parts[1].trim().isEmpty() || parts[2].trim().isEmpty()) {
+                boolean legacy = parts.length == 3 && "BB1".equals(parts[0]);
+                boolean current = parts.length == 3 && "BB2".equals(parts[0]);
+                if ((!legacy && !current) || parts[1].trim().isEmpty() || parts[2].trim().isEmpty()) {
                     throw new Exception("Invalid BOLO pairing code");
                 }
                 byte[] key = decodeKey(parts[2].trim());
-                String payload = getBlob(parts[1].trim());
+                String storedBlobId = current ? FAMILY_PREFIX + parts[1].trim() : parts[1].trim();
+                String payload = getBlob(storedBlobId);
                 JSONObject remote = new JSONObject(decrypt(payload, key));
                 validateRemote(remote);
+
+                // Never replace this phone's local board without first keeping a full local recovery copy.
                 saveSafetySnapshot();
                 global.edit()
-                        .putString(KEY_BLOB, parts[1].trim())
+                        .putString(KEY_BLOB, storedBlobId)
                         .putString(KEY_SECRET, parts[2].trim())
                         .putBoolean(KEY_PROMPT_DISMISSED, true)
                         .apply();
@@ -176,7 +188,7 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
                 long now = System.currentTimeMillis();
                 global.edit().putLong(KEY_LAST_SYNC, now).remove(KEY_LAST_ERROR).apply();
                 refreshMainActivity();
-                complete(callback, true, "Connected and downloaded the shared BOLO Board");
+                complete(callback, true, "Connected • shared board downloaded • previous local data saved as a safety snapshot");
             } catch (Exception e) {
                 complete(callback, false, cleanError(e));
             } finally {
@@ -249,8 +261,12 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
 
     public void disconnect() {
         global.edit()
-                .remove(KEY_BLOB).remove(KEY_SECRET).remove(KEY_LAST_SYNC).remove(KEY_LAST_ERROR)
-                .putBoolean(KEY_PROMPT_DISMISSED, true).apply();
+                .remove(KEY_BLOB)
+                .remove(KEY_SECRET)
+                .remove(KEY_LAST_SYNC)
+                .remove(KEY_LAST_ERROR)
+                .putBoolean(KEY_PROMPT_DISMISSED, true)
+                .apply();
         main.removeCallbacks(debouncedSync);
         main.removeCallbacks(poller);
     }
@@ -284,7 +300,7 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
     private JSONObject buildLocalDocument(long johnMod, long alexisMod) throws Exception {
         JSONObject root = new JSONObject();
         root.put("format", "BOLO_BOARD_FAMILY_SYNC");
-        root.put("version", 1);
+        root.put("version", 2);
         root.put("updatedAt", System.currentTimeMillis());
         root.put("john", profileBlock(john, johnMod));
         root.put("alexis", profileBlock(alexis, alexisMod));
@@ -299,8 +315,12 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
     }
 
     private void validateRemote(JSONObject root) throws Exception {
-        if (!"BOLO_BOARD_FAMILY_SYNC".equals(root.optString("format"))) throw new Exception("The shared data is not a BOLO Board family sync");
-        if (!root.has("john") || !root.has("alexis")) throw new Exception("The shared BOLO Board is incomplete");
+        if (!"BOLO_BOARD_FAMILY_SYNC".equals(root.optString("format"))) {
+            throw new Exception("The shared data is not a BOLO Board family sync");
+        }
+        if (!root.has("john") || !root.has("alexis")) {
+            throw new Exception("The shared BOLO Board is incomplete");
+        }
     }
 
     private void applyRemoteProfile(String profile, JSONObject block) throws Exception {
@@ -317,7 +337,7 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
         root.put("createdAt", System.currentTimeMillis());
         root.put("john", preferencesToJson(john));
         root.put("alexis", preferencesToJson(alexis));
-        global.edit().putString(KEY_SAFETY, root.toString()).apply();
+        global.edit().putString(KEY_SAFETY, root.toString()).commit();
     }
 
     private JSONObject preferencesToJson(SharedPreferences source) throws Exception {
@@ -352,11 +372,12 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
                 editor.putStringSet(key, set);
             } else editor.putString(key, String.valueOf(value));
         }
-        editor.commit();
+        if (!editor.commit()) throw new Exception("Unable to save synchronized profile locally");
     }
 
     private String encrypt(String plaintext, byte[] key) throws Exception {
-        byte[] iv = new byte[12]; random.nextBytes(iv);
+        byte[] iv = new byte[12];
+        random.nextBytes(iv);
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(128, iv));
         byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
@@ -370,7 +391,9 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
 
     private String decrypt(String envelopeText, byte[] key) throws Exception {
         JSONObject envelope = new JSONObject(envelopeText);
-        if (!"BOLO_BOARD_SYNC_ENCRYPTED".equals(envelope.optString("format"))) throw new Exception("Shared data is not encrypted BOLO Board data");
+        if (!"BOLO_BOARD_SYNC_ENCRYPTED".equals(envelope.optString("format"))) {
+            throw new Exception("Shared data is not encrypted BOLO Board data");
+        }
         byte[] iv = Base64.decode(envelope.getString("iv"), Base64.DEFAULT);
         byte[] ciphertext = Base64.decode(envelope.getString("data"), Base64.DEFAULT);
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
@@ -389,40 +412,66 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
     }
 
     private String createBlob(String json) throws Exception {
-        HttpURLConnection conn = open(API_BASE, "POST");
+        // jsonblob.com began returning HTTP 403 to Android POST requests. New family boards use
+        // jsonblob.io instead. The board UUID is generated on-device so the pairing code never
+        // depends on a response header, and the payload is already AES-GCM encrypted before upload.
+        String uuid = UUID.randomUUID().toString();
+        HttpURLConnection conn = open(FAMILY_API_BASE + "/" + uuid, "POST");
         writeJson(conn, json);
         int code = conn.getResponseCode();
-        if (code < 200 || code >= 300) throw new Exception("Cloud create failed (" + code + ")");
-        String location = conn.getHeaderField("Location");
+        if (code < 200 || code >= 300) {
+            String detail = readError(conn);
+            throw new Exception("Cloud create failed (" + code + ")" + detail);
+        }
         consume(conn);
-        if (location == null || location.trim().isEmpty()) throw new Exception("Cloud service did not return a board ID");
-        int slash = location.lastIndexOf('/');
-        return slash >= 0 ? location.substring(slash + 1) : location;
+        return FAMILY_PREFIX + uuid;
     }
 
     private String getBlob(String id) throws Exception {
-        HttpURLConnection conn = open(API_BASE + "/" + id, "GET");
+        if (id.startsWith(FAMILY_PREFIX)) {
+            String uuid = id.substring(FAMILY_PREFIX.length());
+            HttpURLConnection conn = open(FAMILY_API_BASE + "/" + uuid, "GET");
+            int code = conn.getResponseCode();
+            if (code == 404) throw new Exception("Shared board not found. Your local data was not changed");
+            if (code < 200 || code >= 300) throw new Exception("Cloud read failed (" + code + ")" + readError(conn));
+            return readAll(conn.getInputStream());
+        }
+
+        // BB1 pairing codes from v1.7.0 remain readable so an existing shared board is not stranded.
+        HttpURLConnection conn = open(LEGACY_API_BASE + "/" + id, "GET");
         int code = conn.getResponseCode();
         if (code == 404) throw new Exception("Shared board not found. Your local data was not changed");
-        if (code < 200 || code >= 300) throw new Exception("Cloud read failed (" + code + ")");
+        if (code < 200 || code >= 300) throw new Exception("Cloud read failed (" + code + ")" + readError(conn));
         return readAll(conn.getInputStream());
     }
 
     private void putBlob(String id, String json) throws Exception {
-        HttpURLConnection conn = open(API_BASE + "/" + id, "PUT");
+        if (id.startsWith(FAMILY_PREFIX)) {
+            String uuid = id.substring(FAMILY_PREFIX.length());
+            HttpURLConnection conn = open(FAMILY_API_BASE + "/" + uuid, "POST");
+            writeJson(conn, json);
+            int code = conn.getResponseCode();
+            if (code < 200 || code >= 300) throw new Exception("Cloud update failed (" + code + ")" + readError(conn));
+            consume(conn);
+            return;
+        }
+
+        HttpURLConnection conn = open(LEGACY_API_BASE + "/" + id, "PUT");
         writeJson(conn, json);
         int code = conn.getResponseCode();
-        if (code < 200 || code >= 300) throw new Exception("Cloud update failed (" + code + ")");
+        if (code < 200 || code >= 300) throw new Exception("Cloud update failed (" + code + ")" + readError(conn));
         consume(conn);
     }
 
     private HttpURLConnection open(String address, String method) throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(address).openConnection();
         conn.setRequestMethod(method);
-        conn.setConnectTimeout(12000);
-        conn.setReadTimeout(12000);
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(15000);
         conn.setRequestProperty("Accept", "application/json");
         conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        conn.setRequestProperty("User-Agent", "BOLO-Board/1.7.1 Android FamilySync");
+        conn.setInstanceFollowRedirects(true);
         conn.setUseCaches(false);
         return conn;
     }
@@ -431,7 +480,10 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
         conn.setDoOutput(true);
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         conn.setFixedLengthStreamingMode(bytes.length);
-        try (OutputStream out = conn.getOutputStream()) { out.write(bytes); }
+        try (OutputStream out = conn.getOutputStream()) {
+            out.write(bytes);
+            out.flush();
+        }
     }
 
     private void consume(HttpURLConnection conn) {
@@ -440,6 +492,18 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
             if (in != null) while (in.read() != -1) { }
             if (in != null) in.close();
         } catch (Exception ignored) { }
+    }
+
+    private String readError(HttpURLConnection conn) {
+        try {
+            InputStream in = conn.getErrorStream();
+            if (in == null) return "";
+            String body = readAll(in).replace('\n', ' ').replace('\r', ' ').trim();
+            if (body.length() > 80) body = body.substring(0, 80);
+            return body.isEmpty() ? "" : " • " + body;
+        } catch (Exception ignored) {
+            return "";
+        }
     }
 
     private String readAll(InputStream in) throws Exception {
@@ -454,7 +518,7 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
     private String cleanError(Exception e) {
         String m = e.getMessage();
         if (m == null || m.trim().isEmpty()) m = e.getClass().getSimpleName();
-        if (m.length() > 120) m = m.substring(0, 120);
+        if (m.length() > 160) m = m.substring(0, 160);
         return m;
     }
 
@@ -471,9 +535,12 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
         });
     }
 
-    public interface SyncCallback { void done(boolean ok, String message); }
+    public interface SyncCallback {
+        void done(boolean ok, String message);
+    }
 
     @Override public void onActivityCreated(Activity activity, Bundle savedInstanceState) { }
+
     @Override public void onActivityStarted(Activity activity) {
         startedActivities++;
         if (activity instanceof MainActivity) mainActivity = new WeakReference<>(activity);
@@ -485,6 +552,7 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
             }
         }
     }
+
     @Override public void onActivityResumed(Activity activity) {
         if (activity instanceof MainActivity && !isConfigured() && !global.getBoolean(KEY_PROMPT_DISMISSED, false)) {
             main.postDelayed(() -> {
@@ -497,11 +565,14 @@ public class BoloBoardApp extends Application implements Application.ActivityLif
             }, 900L);
         }
     }
+
     @Override public void onActivityPaused(Activity activity) { }
+
     @Override public void onActivityStopped(Activity activity) {
         startedActivities = Math.max(0, startedActivities - 1);
         if (startedActivities == 0) main.removeCallbacks(poller);
     }
+
     @Override public void onActivitySaveInstanceState(Activity activity, Bundle outState) { }
     @Override public void onActivityDestroyed(Activity activity) { }
 }
