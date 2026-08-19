@@ -1,0 +1,1 @@
+BOLO Board v1.7.0 release build verification after Android resource repair.
