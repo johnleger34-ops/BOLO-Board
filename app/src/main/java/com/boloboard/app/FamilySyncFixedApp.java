@@ -2,7 +2,6 @@ package com.boloboard.app;
 
 import android.app.Activity;
 import android.content.SharedPreferences;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Base64;
@@ -34,18 +33,14 @@ import javax.crypto.spec.SecretKeySpec;
 /**
  * BOLO Family Sync transport.
  *
- * New boards use jsonblob.io's documented anonymous create endpoint. The cloud
- * payload is AES-GCM encrypted before upload and this transport never clears the
- * local John/Alexis data when a network request fails.
- *
- * Important: jsonblob.io documents its API with curl-style POST requests. A
- * browser-identifying Android request can be rejected with HTTP 403 by the edge
- * layer, so this version intentionally uses a minimal curl-compatible request
- * profile rather than pretending to be Chrome.
+ * Family boards now use JsonStorage's simple REST API instead of JSONBlob.
+ * The remote service only receives an AES-GCM encrypted envelope. John/Alexis
+ * data stays local on each phone and a failed network request never clears it.
  */
 public class FamilySyncFixedApp extends BoloBoardApp {
-    private static final String API_BASE = "https://jsonblob.io";
-    private static final String PREFIX = "io_";
+    private static final String API_BASE = "https://api.jsonstorage.net/v1/json";
+    private static final String PREFIX = "js_";
+    private static final String PAIR_VERSION = "BB3";
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
@@ -68,6 +63,16 @@ public class FamilySyncFixedApp extends BoloBoardApp {
         if (a == activity) currentMain = new WeakReference<>(null);
     }
 
+    @Override public String getPairingCode() {
+        SharedPreferences global = getSharedPreferences(GLOBAL, MODE_PRIVATE);
+        String stored = global.getString(KEY_BLOB, "");
+        String secret = global.getString(KEY_SECRET, "");
+        if (stored.startsWith(PREFIX) && !secret.isEmpty()) {
+            return PAIR_VERSION + ":" + stored.substring(PREFIX.length()) + ":" + secret;
+        }
+        return super.getPairingCode();
+    }
+
     @Override public void createFamilySync(SyncCallback callback) {
         if (busy.getAndSet(true)) {
             complete(callback, false, "A sync is already running");
@@ -82,10 +87,10 @@ public class FamilySyncFixedApp extends BoloBoardApp {
                 long now = System.currentTimeMillis();
                 JSONObject doc = buildDocument(now, now);
                 String encrypted = encrypt(doc.toString(), key);
-                String uuid = createRemote(encrypted);
+                String remoteId = createRemote(encrypted);
 
                 getSharedPreferences(GLOBAL, MODE_PRIVATE).edit()
-                        .putString(KEY_BLOB, PREFIX + uuid)
+                        .putString(KEY_BLOB, PREFIX + remoteId)
                         .putString(KEY_SECRET, encodedKey)
                         .putLong(KEY_JOHN_MOD, now)
                         .putLong(KEY_ALEXIS_MOD, now)
@@ -111,26 +116,24 @@ public class FamilySyncFixedApp extends BoloBoardApp {
         ioExecutor.execute(() -> {
             try {
                 String[] parts = pairingCode == null ? new String[0] : pairingCode.trim().split(":", 3);
-                if (parts.length != 3 || (!"BB2".equals(parts[0]) && !"BB1".equals(parts[0]))) {
-                    throw new Exception("Invalid BOLO pairing code");
-                }
-                if (parts[1].trim().isEmpty() || parts[2].trim().isEmpty()) throw new Exception("Invalid BOLO pairing code");
+                if (parts.length != 3) throw new Exception("Invalid BOLO pairing code");
 
-                if ("BB1".equals(parts[0])) {
+                if (!PAIR_VERSION.equals(parts[0])) {
                     busy.set(false);
                     super.joinFamilySync(pairingCode, callback);
                     return;
                 }
 
+                if (parts[1].trim().isEmpty() || parts[2].trim().isEmpty()) throw new Exception("Invalid BOLO pairing code");
                 byte[] key = decodeKey(parts[2].trim());
-                String uuid = parts[1].trim();
-                JSONObject remote = new JSONObject(decrypt(readRemote(uuid), key));
+                String remoteId = parts[1].trim();
+                JSONObject remote = new JSONObject(decrypt(readRemote(remoteId), key));
                 validate(remote);
 
                 saveSafetySnapshot();
                 SharedPreferences global = getSharedPreferences(GLOBAL, MODE_PRIVATE);
                 global.edit()
-                        .putString(KEY_BLOB, PREFIX + uuid)
+                        .putString(KEY_BLOB, PREFIX + remoteId)
                         .putString(KEY_SECRET, parts[2].trim())
                         .putBoolean(KEY_PROMPT_DISMISSED, true)
                         .apply();
@@ -155,10 +158,18 @@ public class FamilySyncFixedApp extends BoloBoardApp {
             if (callback != null) complete(callback, false, "Family sync is not connected");
             return;
         }
+
         if (!stored.startsWith(PREFIX)) {
+            if (stored.startsWith("io_")) {
+                String msg = "Old JSONBlob sync detected • create a new Family Sync once, then pair the other phone";
+                global.edit().putString(KEY_LAST_ERROR, msg).apply();
+                if (callback != null) complete(callback, false, msg);
+                return;
+            }
             super.syncNow(userInitiated, callback);
             return;
         }
+
         if (busy.getAndSet(true)) {
             if (callback != null) complete(callback, false, "A sync is already running");
             return;
@@ -167,9 +178,9 @@ public class FamilySyncFixedApp extends BoloBoardApp {
         ioExecutor.execute(() -> {
             boolean pulled = false;
             try {
-                String uuid = stored.substring(PREFIX.length());
+                String remoteId = stored.substring(PREFIX.length());
                 byte[] key = decodeKey(global.getString(KEY_SECRET, ""));
-                JSONObject remote = new JSONObject(decrypt(readRemote(uuid), key));
+                JSONObject remote = new JSONObject(decrypt(readRemote(remoteId), key));
                 validate(remote);
 
                 JSONObject remoteJohn = remote.getJSONObject("john");
@@ -200,7 +211,7 @@ public class FamilySyncFixedApp extends BoloBoardApp {
 
                 if (push) {
                     remote.put("updatedAt", System.currentTimeMillis());
-                    updateRemote(uuid, encrypt(remote.toString(), key));
+                    updateRemote(remoteId, encrypt(remote.toString(), key));
                 }
 
                 global.edit().putLong(KEY_LAST_SYNC, System.currentTimeMillis()).remove(KEY_LAST_ERROR).apply();
@@ -220,7 +231,7 @@ public class FamilySyncFixedApp extends BoloBoardApp {
     private JSONObject buildDocument(long johnMod, long alexisMod) throws Exception {
         JSONObject root = new JSONObject();
         root.put("format", "BOLO_BOARD_FAMILY_SYNC");
-        root.put("version", 2);
+        root.put("version", 3);
         root.put("updatedAt", System.currentTimeMillis());
         root.put("john", profileBlock(getSharedPreferences(JOHN, MODE_PRIVATE), johnMod));
         root.put("alexis", profileBlock(getSharedPreferences(ALEXIS, MODE_PRIVATE), alexisMod));
@@ -314,57 +325,77 @@ public class FamilySyncFixedApp extends BoloBoardApp {
         }
     }
 
-    private String createRemote(String json) throws Exception {
-        HttpURLConnection conn = open(API_BASE + "/", "POST");
-        write(conn, json);
+    private String createRemote(String encrypted) throws Exception {
+        JSONObject wrapper = new JSONObject();
+        wrapper.put("payload", encrypted);
+        HttpURLConnection conn = request(API_BASE, "POST", wrapper.toString());
         int code = conn.getResponseCode();
-        if (code < 200 || code >= 300) throw new Exception("Cloud create failed (" + code + ")" + readError(conn));
-        String uuid = conn.getHeaderField("x-blob-uuid");
-        if (uuid == null || uuid.trim().isEmpty()) uuid = conn.getHeaderField("X-Blob-Uuid");
-        consume(conn);
-        if (uuid == null || uuid.trim().isEmpty()) throw new Exception("Cloud created the board but did not return its pairing ID");
-        return uuid.trim();
+        String body = readBody(conn, code);
+        if (code < 200 || code >= 300) throw new Exception("Family cloud create failed (" + code + ")" + shortBody(body));
+        String uri = new JSONObject(body).optString("uri", "").trim();
+        String marker = "/v1/json/";
+        int at = uri.indexOf(marker);
+        if (at < 0 || at + marker.length() >= uri.length()) throw new Exception("Family cloud did not return a usable board ID");
+        return uri.substring(at + marker.length());
     }
 
-    private String readRemote(String uuid) throws Exception {
-        HttpURLConnection conn = open(API_BASE + "/" + uuid, "GET");
+    private String readRemote(String remoteId) throws Exception {
+        HttpURLConnection conn = request(API_BASE + "/" + remoteId, "GET", null);
         int code = conn.getResponseCode();
+        String body = readBody(conn, code);
         if (code == 404) throw new Exception("Shared board not found");
-        if (code < 200 || code >= 300) throw new Exception("Cloud read failed (" + code + ")" + readError(conn));
-        return readAll(conn.getInputStream());
+        if (code < 200 || code >= 300) throw new Exception("Family cloud read failed (" + code + ")" + shortBody(body));
+        JSONObject wrapper = new JSONObject(body);
+        String payload = wrapper.optString("payload", "");
+        if (payload.isEmpty()) throw new Exception("Shared board payload is missing");
+        return payload;
     }
 
-    private void updateRemote(String uuid, String json) throws Exception {
-        HttpURLConnection conn = open(API_BASE + "/" + uuid, "POST");
-        write(conn, json);
+    private void updateRemote(String remoteId, String encrypted) throws Exception {
+        JSONObject wrapper = new JSONObject();
+        wrapper.put("payload", encrypted);
+        HttpURLConnection conn = request(API_BASE + "/" + remoteId, "PUT", wrapper.toString());
         int code = conn.getResponseCode();
-        if (code < 200 || code >= 300) throw new Exception("Cloud update failed (" + code + ")" + readError(conn));
-        consume(conn);
+        String body = readBody(conn, code);
+        if (code < 200 || code >= 300) throw new Exception("Family cloud update failed (" + code + ")" + shortBody(body));
     }
 
-    private HttpURLConnection open(String address, String method) throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URL(address).openConnection();
-        conn.setRequestMethod(method);
-        conn.setConnectTimeout(15000);
-        conn.setReadTimeout(15000);
-        conn.setRequestProperty("Accept", "*/*");
-        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-        conn.setRequestProperty("User-Agent", "curl/8.5.0");
-        conn.setRequestProperty("Cache-Control", "no-cache");
-        conn.setRequestProperty("Connection", "close");
-        conn.setUseCaches(false);
-        conn.setInstanceFollowRedirects(true);
-        return conn;
-    }
-
-    private void write(HttpURLConnection conn, String json) throws Exception {
-        conn.setDoOutput(true);
-        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-        conn.setFixedLengthStreamingMode(bytes.length);
-        try (OutputStream out = conn.getOutputStream()) {
-            out.write(bytes);
-            out.flush();
+    private HttpURLConnection request(String address, String method, String body) throws Exception {
+        Exception last = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                HttpURLConnection conn = (HttpURLConnection) new URL(address).openConnection();
+                conn.setRequestMethod(method);
+                conn.setConnectTimeout(12000);
+                conn.setReadTimeout(12000);
+                conn.setRequestProperty("Accept", "application/json");
+                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                conn.setRequestProperty("User-Agent", "BOLO-Board/1.8");
+                conn.setRequestProperty("Cache-Control", "no-cache");
+                conn.setUseCaches(false);
+                conn.setInstanceFollowRedirects(true);
+                if (body != null) {
+                    conn.setDoOutput(true);
+                    byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+                    conn.setFixedLengthStreamingMode(bytes.length);
+                    try (OutputStream out = conn.getOutputStream()) {
+                        out.write(bytes);
+                        out.flush();
+                    }
+                }
+                return conn;
+            } catch (Exception e) {
+                last = e;
+                if (attempt < 2) Thread.sleep(500L * (attempt + 1));
+            }
         }
+        throw last == null ? new Exception("Unable to contact family cloud") : last;
+    }
+
+    private String readBody(HttpURLConnection conn, int code) throws Exception {
+        InputStream in = code >= 200 && code < 400 ? conn.getInputStream() : conn.getErrorStream();
+        if (in == null) return "";
+        return readAll(in);
     }
 
     private String readAll(InputStream in) throws Exception {
@@ -376,24 +407,11 @@ public class FamilySyncFixedApp extends BoloBoardApp {
         return sb.toString();
     }
 
-    private void consume(HttpURLConnection conn) {
-        try {
-            InputStream in = conn.getInputStream();
-            if (in != null) while (in.read() != -1) { }
-            if (in != null) in.close();
-        } catch (Exception ignored) { }
-    }
-
-    private String readError(HttpURLConnection conn) {
-        try {
-            InputStream in = conn.getErrorStream();
-            if (in == null) return "";
-            String body = readAll(in).replace('\n', ' ').replace('\r', ' ').trim();
-            if (body.length() > 100) body = body.substring(0, 100);
-            return body.isEmpty() ? "" : " • " + body;
-        } catch (Exception ignored) {
-            return "";
-        }
+    private String shortBody(String body) {
+        if (body == null) return "";
+        String clean = body.replace('\n', ' ').replace('\r', ' ').trim();
+        if (clean.length() > 120) clean = clean.substring(0, 120);
+        return clean.isEmpty() ? "" : " • " + clean;
     }
 
     private String clean(Exception e) {
